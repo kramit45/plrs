@@ -1,6 +1,7 @@
 package com.plrs.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -13,8 +14,15 @@ import com.tngtech.archunit.lang.ArchRule;
 // infrastructure and web classes too.
 
 /**
- * ArchUnit test harness — smoke rule only for this iteration. Real module
- * boundary and layering rules land in steps 9 and 10.
+ * ArchUnit module-boundary rules for the PLRS codebase.
+ *
+ * <ul>
+ *   <li>{@code classes_are_either_public_or_not_public} — smoke rule.
+ *   <li>{@code domain_must_not_depend_on_frameworks} — enforces that
+ *       {@code com.plrs.domain} stays on the Java standard library; no Spring,
+ *       JPA, Jackson, Hibernate or Lombok imports are allowed so the domain
+ *       model remains portable and readable as vanilla Java.
+ * </ul>
  *
  * <p>Traces to: §3.a — module boundary enforcement.
  */
@@ -30,5 +38,22 @@ class ArchitectureTests {
                     .bePublic()
                     .orShould()
                     .notBePublic()
+                    .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule domain_must_not_depend_on_frameworks =
+            noClasses()
+                    .that()
+                    .resideInAPackage("..plrs.domain..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "org.springframework..",
+                            "jakarta.persistence..",
+                            "com.fasterxml.jackson..",
+                            "org.springframework.data..",
+                            "lombok..",
+                            "org.hibernate..")
+                    .because("domain must remain framework-free per §3.a")
                     .allowEmptyShould(true);
 }
