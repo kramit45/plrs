@@ -17,15 +17,6 @@
     <name>PLRS Infrastructure</name>
     <description>Adapters — JPA, Redis, MapStruct; implements application ports (MCSP-232).</description>
 
-    <properties>
-        <!--
-          Spring Boot 3.2 manages Flyway 9.x, where PostgreSQL support is bundled
-          in flyway-core. The flyway-database-postgresql split artifact only exists
-          on Flyway 10+, so we bump the managed Flyway version locally.
-        -->
-        <flyway.version>10.10.0</flyway.version>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>com.plrs</groupId>
@@ -45,11 +36,6 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
-            <version>${flyway.version}</version>
         </dependency>
 
         <dependency>
