@@ -1,0 +1,34 @@
+package com.plrs.architecture;
+
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+
+// Scope note: hosted in plrs-application; at this step the test classpath only
+// sees com.plrs.domain and com.plrs.application classes. The harness will be
+// promoted to plrs-web in steps 9/10 if the layering rules need to inspect
+// infrastructure and web classes too.
+
+/**
+ * ArchUnit test harness — smoke rule only for this iteration. Real module
+ * boundary and layering rules land in steps 9 and 10.
+ *
+ * <p>Traces to: §3.a — module boundary enforcement.
+ */
+@AnalyzeClasses(packages = "com.plrs", importOptions = ImportOption.DoNotIncludeTests.class)
+class ArchitectureTests {
+
+    @ArchTest
+    static final ArchRule classes_are_either_public_or_not_public =
+            classes()
+                    .that()
+                    .resideInAPackage("..plrs..")
+                    .should()
+                    .bePublic()
+                    .orShould()
+                    .notBePublic()
+                    .allowEmptyShould(true);
+}
