@@ -37,6 +37,7 @@
 
     <modules>
         <module>plrs-domain</module>
+        <module>plrs-application</module>
     </modules>
 
     <dependencyManagement>
