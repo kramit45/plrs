@@ -1,13 +1,21 @@
 spring:
   application:
     name: plrs
-  # Temporary boot shim — real DataSource, Flyway and Redis wiring lands in
-  # steps 12–14. Until then we exclude their auto-configurations so the app
-  # can start for /actuator/health smoke testing.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/plrs}
+    username: ${DB_USER:plrs}
+    password: ${DB_PASS:plrs}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: plrs_ops
+  # Flyway and Redis are wired in steps 13–14; exclude their auto-configs
+  # until then so Boot can start against a bare PostgreSQL.
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
       - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration

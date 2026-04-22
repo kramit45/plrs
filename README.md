@@ -14,7 +14,14 @@ _TBD_
 
 ## Quick Start
 
-_TBD_
+Prerequisites: JDK 17, Maven 3.9+, and a running Docker daemon (required for integration tests — `mvn -pl plrs-infrastructure verify` spins up PostgreSQL via Testcontainers).
+
+If you use Colima instead of Docker Desktop, export these so Testcontainers can find the socket:
+
+```sh
+export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="/var/run/docker.sock"
+```
 
 ## Testing
 
