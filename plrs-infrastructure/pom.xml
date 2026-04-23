@@ -73,14 +73,23 @@
 
     <build>
         <plugins>
+            <!--
+              docker-java (bundled by Testcontainers) defaults its client
+              API to 1.32, which Docker Engine 25+ rejects. Pin to 1.44,
+              the floor every modern daemon advertises as supported.
+              The same argLine is applied to both surefire (for *Test.java
+              testcontainers-backed UTs) and failsafe (for *IT.java).
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <!--
-                  docker-java (bundled by Testcontainers) defaults its client
-                  API to 1.32, which Docker Engine 25+ rejects. Pin to 1.44,
-                  the floor every modern daemon advertises as supported.
-                -->
+                <configuration>
+                    <argLine>-Dapi.version=1.44</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
                     <argLine>-Dapi.version=1.44</argLine>
                 </configuration>

@@ -190,5 +190,18 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!--
+              Activate failsafe across every module. The pluginManagement
+              block above supplies the *IT.java include and the
+              integration-test/verify goal bindings; this entry is what
+              actually attaches the plugin to each reactor module.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 </project>

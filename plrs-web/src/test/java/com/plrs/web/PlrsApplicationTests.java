@@ -11,11 +11,13 @@ import org.springframework.boot.test.context.SpringBootTest;
  * <ul>
  *   <li>DataSource + Hibernate auto-config are excluded (Hibernate otherwise
  *       tries to read JDBC metadata at startup to determine the dialect).
+ *       With DataSource excluded, {@code FlywayAutoConfiguration} also
+ *       short-circuits on its {@code @ConditionalOnBean(DataSource.class)}.
  *   <li>{@code spring.datasource.url} is overridden to {@code false} so the
  *       {@code @ConditionalOnProperty} on {@code PersistenceConfig} evaluates
  *       to absent and {@code @EnableJpaRepositories} does not fire.
- *   <li>Flyway and Redis auto-config remain excluded via {@code application.yml}
- *       until steps 13–14 wire them up.
+ *   <li>Redis auto-config remains excluded via {@code application.yml} until
+ *       step 14 wires it up.
  * </ul>
  *
  * <p>Integration tests that exercise the real datasource live in
@@ -27,7 +29,6 @@ import org.springframework.boot.test.context.SpringBootTest;
             "spring.autoconfigure.exclude="
                     + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
                     + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
-                    + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration,"
                     + "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,"
                     + "org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration"
         })
