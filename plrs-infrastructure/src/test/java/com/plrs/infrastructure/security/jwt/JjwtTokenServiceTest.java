@@ -176,8 +176,14 @@ class JjwtTokenServiceTest {
     }
 
     private static String flipLastSignatureChar(String token) {
-        char last = token.charAt(token.length() - 1);
-        char replacement = last == 'A' ? 'B' : 'A';
-        return token.substring(0, token.length() - 1) + replacement;
+        // Flip the first char of the signature segment rather than the last.
+        // The final base64url char encodes padding bits that may not map to
+        // any signature byte, so A↔B there can leave the decoded signature
+        // unchanged — flakily passing verification. The first signature
+        // char is always fully meaningful.
+        int dot = token.lastIndexOf('.');
+        char c = token.charAt(dot + 1);
+        char replacement = c == 'A' ? 'B' : 'A';
+        return token.substring(0, dot + 1) + replacement + token.substring(dot + 2);
     }
 }
