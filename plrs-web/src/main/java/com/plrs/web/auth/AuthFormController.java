@@ -12,6 +12,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
@@ -59,6 +60,36 @@ public class AuthFormController {
             model.addAttribute("form", new RegisterFormModel("", ""));
         }
         return "auth/register";
+    }
+
+    /**
+     * Renders the login view. The {@code POST /login} that this form
+     * submits to is handled by Spring Security's form-login filter, not
+     * by a controller method. Three query-string flags surface states
+     * produced by that filter (and by registration):
+     *
+     * <ul>
+     *   <li>{@code ?registered} — set by
+     *       {@link #submit(RegisterFormModel, BindingResult, RedirectAttributes)}
+     *       on successful registration, so the user lands here with a
+     *       success banner.
+     *   <li>{@code ?logout} — set by Spring Security on successful
+     *       logout.
+     *   <li>{@code ?error} — set by Spring Security on failed form
+     *       login; the view renders the generic "invalid email or
+     *       password" copy, matching the API's 401 body.
+     * </ul>
+     */
+    @GetMapping("/login")
+    public String showLogin(
+            @RequestParam(required = false) String error,
+            @RequestParam(required = false) String logout,
+            @RequestParam(required = false) String registered,
+            Model model) {
+        model.addAttribute("error", error);
+        model.addAttribute("logout", logout);
+        model.addAttribute("registered", registered);
+        return "auth/login";
     }
 
     @PostMapping("/register")
