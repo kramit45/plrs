@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Structured-logging configuration for PLRS.
+
+  Profile strategy:
+    * local, test      — human-readable pattern layout so developer consoles
+                         stay grep-friendly and test output is diff-friendly.
+    * every other      — JSON via LogstashEncoder so prod/staging logs ship
+      (prod included)    directly into whatever aggregator is pointed at stdout
+                         (Loki / Elastic / Cloud Logging).
+
+  MDC contract:
+    * requestId — always populated by RequestIdFilter on servlet requests
+                  (may be absent during startup / async tasks).
+    * userId    — populated downstream by the auth filter (step 33+); absent
+                  for anonymous endpoints like /health.
+
+  Traces to: §2.c NFR (observability), §7 (audit traceability).
+-->
+<configuration>
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="plrs"/>
+
+    <springProfile name="local | test">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${appName}] [req=%X{requestId:-} user=%X{userId:-}] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <springProfile name="!local &amp; !test">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>requestId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <customFields>{"app":"${appName}"}</customFields>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="com.plrs" level="INFO"/>
+
+</configuration>
