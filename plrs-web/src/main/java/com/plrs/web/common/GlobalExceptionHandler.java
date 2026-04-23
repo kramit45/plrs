@@ -1,5 +1,6 @@
 package com.plrs.web.common;
 
+import com.plrs.application.security.InvalidTokenException;
 import com.plrs.application.user.EmailAlreadyRegisteredException;
 import com.plrs.application.user.InvalidCredentialsException;
 import com.plrs.domain.common.DomainValidationException;
@@ -38,6 +39,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *       password; the response body is identical for both to prevent
  *       account enumeration, and we log at WARN with only the request id
  *       (never the attempted email).
+ *   <li>{@link InvalidTokenException} → 401 — refresh/access JWT failed
+ *       verification (bad signature, expired, wrong issuer, tampered, or
+ *       the token value itself was missing from the logout/refresh
+ *       request); logged at WARN with only the request id, never the
+ *       token value.
  *   <li>{@link MethodArgumentNotValidException} → 400 — bean-validation
  *       failures on request records (e.g. {@code @NotBlank}). The detail
  *       body includes a per-field error map.
@@ -102,6 +108,16 @@ public class GlobalExceptionHandler {
                 "invalid-credentials",
                 "Unauthorized",
                 "Invalid email or password");
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ProblemDetail handleInvalidToken(InvalidTokenException e) {
+        log.warn("token rejected (requestId={})", MDC.get("requestId"));
+        return problem(
+                HttpStatus.UNAUTHORIZED,
+                "invalid-token",
+                "Unauthorized",
+                "Invalid or expired token");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

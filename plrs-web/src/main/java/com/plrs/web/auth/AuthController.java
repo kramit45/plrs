@@ -3,6 +3,8 @@ package com.plrs.web.auth;
 import com.plrs.application.user.LoginCommand;
 import com.plrs.application.user.LoginResult;
 import com.plrs.application.user.LoginUseCase;
+import com.plrs.application.user.LogoutCommand;
+import com.plrs.application.user.LogoutUseCase;
 import com.plrs.application.user.RegisterUserCommand;
 import com.plrs.application.user.RegisterUserUseCase;
 import com.plrs.domain.user.Role;
@@ -44,6 +46,15 @@ import org.springframework.web.bind.annotation.RestController;
  *       {@link com.plrs.application.user.LoginUseCase}).
  * </ul>
  *
+ * <p>{@code POST /api/auth/logout}
+ *
+ * <ul>
+ *   <li>Request: {@link LogoutRequest} — non-blank refresh token.
+ *   <li>Success: 204 No Content — the refresh-token allow-list entry is
+ *       revoked (idempotent; a second logout is also a 204).
+ *   <li>Failure: 400 for validation, 401 for an invalid or expired token.
+ * </ul>
+ *
  * <p>The {@code findById} read-back after registration is a deliberate
  * defence-in-depth step: if something goes wrong between the save and the
  * response, we fail loudly rather than return a 201 with stale data.
@@ -52,7 +63,8 @@ import org.springframework.web.bind.annotation.RestController;
  * so the no-DB {@code PlrsApplicationTests} smoke test does not try to
  * wire a controller whose use-case beans are also gated off.
  *
- * <p>Traces to: §2.c (registration + login FR), §7 (JWT issuance).
+ * <p>Traces to: §2.c (registration + login + logout FR), §7 (JWT
+ * issuance and refresh-token allow-list revocation).
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -61,14 +73,17 @@ public class AuthController {
 
     private final RegisterUserUseCase registerUseCase;
     private final LoginUseCase loginUseCase;
+    private final LogoutUseCase logoutUseCase;
     private final UserRepository userRepository;
 
     public AuthController(
             RegisterUserUseCase registerUseCase,
             LoginUseCase loginUseCase,
+            LogoutUseCase logoutUseCase,
             UserRepository userRepository) {
         this.registerUseCase = registerUseCase;
         this.loginUseCase = loginUseCase;
+        this.logoutUseCase = logoutUseCase;
         this.userRepository = userRepository;
     }
 
@@ -103,5 +118,11 @@ public class AuthController {
                         roleNames,
                         r.accessExpiresAt(),
                         r.refreshExpiresAt()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest req) {
+        logoutUseCase.handle(new LogoutCommand(req.refreshToken()));
+        return ResponseEntity.noContent().build();
     }
 }

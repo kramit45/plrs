@@ -1,6 +1,9 @@
 package com.plrs.web.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -8,10 +11,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.plrs.application.security.InvalidTokenException;
 import com.plrs.application.user.EmailAlreadyRegisteredException;
 import com.plrs.application.user.InvalidCredentialsException;
 import com.plrs.application.user.LoginResult;
 import com.plrs.application.user.LoginUseCase;
+import com.plrs.application.user.LogoutCommand;
+import com.plrs.application.user.LogoutUseCase;
 import com.plrs.application.user.RegisterUserUseCase;
 import com.plrs.domain.common.DomainValidationException;
 import com.plrs.domain.user.BCryptHash;
@@ -29,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -53,6 +60,7 @@ class AuthControllerTest {
 
     @MockBean private RegisterUserUseCase registerUseCase;
     @MockBean private LoginUseCase loginUseCase;
+    @MockBean private LogoutUseCase logoutUseCase;
     @MockBean private UserRepository userRepository;
 
     private static User userWithId(UserId id, String email) {
@@ -270,5 +278,74 @@ class AuthControllerTest {
                                 .string(Matchers.not(Matchers.containsString("passwordHash"))))
                 .andExpect(
                         content().string(Matchers.not(Matchers.containsString(VALID_HASH))));
+    }
+
+    @Test
+    void postLogoutHappyPathReturns204AndCallsUseCaseWithToken() throws Exception {
+        String token = "refresh.jwt.token.abc";
+
+        mockMvc.perform(
+                        post("/api/auth/logout")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"" + token + "\"}"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        ArgumentCaptor<LogoutCommand> captor = ArgumentCaptor.forClass(LogoutCommand.class);
+        verify(logoutUseCase).handle(captor.capture());
+        assertThat(captor.getValue().refreshToken()).isEqualTo(token);
+    }
+
+    @Test
+    void postLogoutWithInvalidTokenReturns401() throws Exception {
+        doThrow(new InvalidTokenException("bad signature"))
+                .when(logoutUseCase)
+                .handle(any());
+
+        mockMvc.perform(
+                        post("/api/auth/logout")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"bogus.token.value\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Unauthorized"))
+                .andExpect(jsonPath("$.detail").value("Invalid or expired token"));
+    }
+
+    @Test
+    void postLogoutMissingRefreshTokenReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/logout")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.errors.refreshToken", Matchers.notNullValue()));
+    }
+
+    @Test
+    void postLogoutBlankRefreshTokenReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/logout")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.errors.refreshToken", Matchers.notNullValue()));
+    }
+
+    @Test
+    void postLogoutResponseNeverEchoesTokenValue() throws Exception {
+        String token = "very-secret-refresh-jwt-xyz";
+        doThrow(new InvalidTokenException("expired"))
+                .when(logoutUseCase)
+                .handle(any());
+
+        mockMvc.perform(
+                        post("/api/auth/logout")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"refreshToken\":\"" + token + "\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(Matchers.not(Matchers.containsString(token))));
     }
 }
