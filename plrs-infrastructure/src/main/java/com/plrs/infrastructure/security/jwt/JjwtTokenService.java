@@ -105,7 +105,7 @@ public final class JjwtTokenService implements TokenService {
                         .signWith(keyProvider.privateKey(), Jwts.SIG.RS256)
                         .compact();
 
-        return new IssuedTokens(access, refresh, refreshJti, refreshExp);
+        return new IssuedTokens(access, refresh, refreshJti, accessExp, refreshExp);
     }
 
     @Override
