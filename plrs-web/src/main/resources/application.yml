@@ -32,3 +32,13 @@ management:
     web:
       exposure:
         include: health,info
+
+plrs:
+  jwt:
+    access-token-ttl: 2h
+    refresh-token-ttl: 30d
+    issuer: plrs
+    audience: plrs-web
+    generate-if-missing: ${PLRS_JWT_GENERATE_IF_MISSING:true}
+    private-key-pem: ${PLRS_JWT_PRIVATE_KEY_PEM:}
+    public-key-pem: ${PLRS_JWT_PUBLIC_KEY_PEM:}

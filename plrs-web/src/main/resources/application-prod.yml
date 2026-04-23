@@ -1,0 +1,7 @@
+# Production profile overrides. JWT signing keys must be supplied via
+# PLRS_JWT_PRIVATE_KEY_PEM / PLRS_JWT_PUBLIC_KEY_PEM; an ephemeral
+# keypair is never acceptable in prod because it would invalidate every
+# issued token on each restart.
+plrs:
+  jwt:
+    generate-if-missing: false
