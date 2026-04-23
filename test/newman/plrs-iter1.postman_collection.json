@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "PLRS Iter1 E2E",
+    "description": "Register -> login -> authenticated /api/me -> logout (twice, idempotent). Traces to: §3.e (API E2E).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register new user",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.environment.set('testEmail', `newman-${Date.now()}@example.com`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('Response echoes registered email', () => {",
+              "  pm.expect(body.email).to.eql(pm.environment.get('testEmail'));",
+              "});",
+              "pm.test('Response has userId', () => {",
+              "  pm.expect(body.userId).to.be.a('string').and.to.not.be.empty;",
+              "});",
+              "pm.environment.set('userId', body.userId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Token type is Bearer', () => pm.expect(body.tokenType).to.eql('Bearer'));",
+              "pm.test('Roles contain STUDENT', () => pm.expect(body.roles).to.include('STUDENT'));",
+              "pm.test('Access token present', () => pm.expect(body.accessToken).to.be.a('string').and.to.not.be.empty);",
+              "pm.test('Refresh token present', () => pm.expect(body.refreshToken).to.be.a('string').and.to.not.be.empty);",
+              "pm.environment.set('accessToken', body.accessToken);",
+              "pm.environment.set('refreshToken', body.refreshToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Authenticated /api/me",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('userId matches registered user', () => {",
+              "  pm.expect(body.userId).to.eql(pm.environment.get('userId'));",
+              "});",
+              "pm.test('Roles contain ROLE_STUDENT', () => {",
+              "  pm.expect(body.roles).to.include('ROLE_STUDENT');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "me"]
+        }
+      }
+    },
+    {
+      "name": "Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 204', () => pm.response.to.have.status(204));",
+              "pm.test('Body is empty', () => pm.expect(pm.response.text()).to.eql(''));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"]
+        }
+      }
+    },
+    {
+      "name": "Logout again (idempotent)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Already-revoked refresh still returns 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"]
+        }
+      }
+    }
+  ]
+}
