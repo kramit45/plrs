@@ -1,6 +1,7 @@
 package com.plrs.web.common;
 
 import com.plrs.application.user.EmailAlreadyRegisteredException;
+import com.plrs.application.user.InvalidCredentialsException;
 import com.plrs.domain.common.DomainValidationException;
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -33,6 +34,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *       failure, etc.).
  *   <li>{@link EmailAlreadyRegisteredException} → 409 — uniqueness clash
  *       detected by the use case.
+ *   <li>{@link InvalidCredentialsException} → 401 — unknown email or wrong
+ *       password; the response body is identical for both to prevent
+ *       account enumeration, and we log at WARN with only the request id
+ *       (never the attempted email).
  *   <li>{@link MethodArgumentNotValidException} → 400 — bean-validation
  *       failures on request records (e.g. {@code @NotBlank}). The detail
  *       body includes a per-field error map.
@@ -87,6 +92,16 @@ public class GlobalExceptionHandler {
                         "One or more fields are invalid");
         p.setProperty("errors", fieldErrors);
         return p;
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException e) {
+        log.warn("login rejected (requestId={})", MDC.get("requestId"));
+        return problem(
+                HttpStatus.UNAUTHORIZED,
+                "invalid-credentials",
+                "Unauthorized",
+                "Invalid email or password");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

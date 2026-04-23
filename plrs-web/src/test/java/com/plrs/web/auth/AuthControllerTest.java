@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.plrs.application.user.EmailAlreadyRegisteredException;
+import com.plrs.application.user.InvalidCredentialsException;
+import com.plrs.application.user.LoginResult;
+import com.plrs.application.user.LoginUseCase;
 import com.plrs.application.user.RegisterUserUseCase;
 import com.plrs.domain.common.DomainValidationException;
 import com.plrs.domain.user.BCryptHash;
@@ -49,6 +52,7 @@ class AuthControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockBean private RegisterUserUseCase registerUseCase;
+    @MockBean private LoginUseCase loginUseCase;
     @MockBean private UserRepository userRepository;
 
     private static User userWithId(UserId id, String email) {
@@ -154,5 +158,117 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("Validation failed"));
+    }
+
+    private static LoginResult stubLoginResult(UserId id, String email) {
+        Instant access = T0.plusSeconds(7200);
+        Instant refresh = T0.plusSeconds(2592000);
+        return new LoginResult(
+                id,
+                Email.of(email),
+                Set.of(Role.STUDENT, Role.INSTRUCTOR),
+                "access.jwt.token",
+                "refresh.jwt.token",
+                access,
+                refresh);
+    }
+
+    @Test
+    void postLoginHappyPathReturnsTokens() throws Exception {
+        UserId id = UserId.of(UUID.randomUUID());
+        when(loginUseCase.handle(any())).thenReturn(stubLoginResult(id, "kumar@example.com"));
+
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"email\":\"kumar@example.com\","
+                                                + "\"password\":\"Password01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.accessToken").value("access.jwt.token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh.jwt.token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.userId").value(id.value().toString()))
+                .andExpect(jsonPath("$.email").value("kumar@example.com"))
+                .andExpect(jsonPath("$.roles", Matchers.containsInAnyOrder("STUDENT", "INSTRUCTOR")))
+                .andExpect(jsonPath("$.accessExpiresAt").value("2026-04-23T12:00:00Z"))
+                .andExpect(jsonPath("$.refreshExpiresAt").value("2026-05-23T10:00:00Z"));
+    }
+
+    @Test
+    void postLoginWrongPasswordReturns401WithGenericProblem() throws Exception {
+        when(loginUseCase.handle(any())).thenThrow(new InvalidCredentialsException());
+
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"email\":\"kumar@example.com\","
+                                                + "\"password\":\"Wrong12345\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Unauthorized"))
+                .andExpect(jsonPath("$.detail").value("Invalid email or password"))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("kumar"))))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("Wrong12345"))));
+    }
+
+    @Test
+    void postLoginUnknownEmailReturns401WithSameBody() throws Exception {
+        when(loginUseCase.handle(any())).thenThrow(new InvalidCredentialsException());
+
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"email\":\"ghost@example.com\","
+                                                + "\"password\":\"Password01\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("Invalid email or password"));
+    }
+
+    @Test
+    void postLoginMissingFieldsReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"\",\"password\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Invalid request"))
+                .andExpect(jsonPath("$.errors.email", Matchers.notNullValue()))
+                .andExpect(jsonPath("$.errors.password", Matchers.notNullValue()));
+    }
+
+    @Test
+    void postLoginMalformedJsonReturns400() throws Exception {
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Malformed request body"));
+    }
+
+    @Test
+    void postLoginResponseDoesNotContainPasswordHash() throws Exception {
+        UserId id = UserId.of(UUID.randomUUID());
+        when(loginUseCase.handle(any())).thenReturn(stubLoginResult(id, "kumar@example.com"));
+
+        mockMvc.perform(
+                        post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"email\":\"kumar@example.com\","
+                                                + "\"password\":\"Password01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        content()
+                                .string(Matchers.not(Matchers.containsString("passwordHash"))))
+                .andExpect(
+                        content().string(Matchers.not(Matchers.containsString(VALID_HASH))));
     }
 }
