@@ -6,33 +6,39 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.plrs.web.health.HealthController;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
- * Slice test pinning the two contractual behaviors of {@link RequestIdFilter}:
- * the filter always stamps an {@code X-Request-Id} on the response, and when
- * the caller supplies one it is echoed verbatim. HealthController is the
- * target because it is the only controller in the module today and has no
- * dependencies that would drag in a full context.
+ * Pins the two contractual behaviours of {@link RequestIdFilter}: the
+ * filter always stamps an {@code X-Request-Id} on the response, and when
+ * the caller supplies one it is echoed verbatim. Uses standalone
+ * MockMvc rather than {@code @WebMvcTest} so the test has no opinion on
+ * whatever security filter chain the web module configures — all we
+ * want to exercise is this one filter against a bare controller.
  */
-@WebMvcTest(HealthController.class)
-@Import(RequestIdFilter.class)
 class RequestIdFilterTest {
 
-    @Autowired
     private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc =
+                MockMvcBuilders.standaloneSetup(new HealthController())
+                        .addFilters(new RequestIdFilter())
+                        .build();
+    }
 
     @Test
     void generatesRequestIdWhenInboundHeaderAbsent() throws Exception {
-        MvcResult result = mockMvc.perform(get("/health"))
-                .andExpect(status().isOk())
-                .andExpect(header().exists("X-Request-Id"))
-                .andReturn();
+        MvcResult result =
+                mockMvc.perform(get("/health"))
+                        .andExpect(status().isOk())
+                        .andExpect(header().exists("X-Request-Id"))
+                        .andReturn();
 
         String generated = result.getResponse().getHeader("X-Request-Id");
         assertThat(generated).isNotBlank();

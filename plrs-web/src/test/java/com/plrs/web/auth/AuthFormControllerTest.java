@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.plrs.application.security.TokenService;
 import com.plrs.application.user.EmailAlreadyRegisteredException;
 import com.plrs.application.user.RegisterUserUseCase;
 import com.plrs.domain.common.DomainValidationException;
@@ -20,6 +21,7 @@ import com.plrs.web.common.GlobalExceptionHandler;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
@@ -32,11 +34,13 @@ import org.springframework.test.web.servlet.MockMvc;
                 @ComponentScan.Filter(
                         type = FilterType.ASSIGNABLE_TYPE,
                         classes = GlobalExceptionHandler.class))
+@AutoConfigureMockMvc(addFilters = false)
 class AuthFormControllerTest {
 
     @Autowired private MockMvc mockMvc;
 
     @MockBean private RegisterUserUseCase registerUseCase;
+    @MockBean private TokenService tokenService;
 
     @Test
     void getRegisterRenders200WithFormModel() throws Exception {
