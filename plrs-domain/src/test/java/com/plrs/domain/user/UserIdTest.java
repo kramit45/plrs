@@ -3,6 +3,7 @@ package com.plrs.domain.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.plrs.domain.common.DomainValidationException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -40,20 +41,20 @@ class UserIdTest {
     @Test
     void ofRejectsNullUuid() {
         assertThatThrownBy(() -> UserId.of((UUID) null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("must not be null");
     }
 
     @Test
     void ofRejectsInvalidString() {
         assertThatThrownBy(() -> UserId.of("not-a-uuid"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(DomainValidationException.class);
     }
 
     @Test
     void ofRejectsNullString() {
         assertThatThrownBy(() -> UserId.of((String) null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("must not be null");
     }
 

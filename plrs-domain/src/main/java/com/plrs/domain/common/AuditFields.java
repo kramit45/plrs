@@ -26,9 +26,8 @@ import java.util.Objects;
  * overloads exist so tests and other callers can pin the current instant
  * without relying on {@link Instant#now()}.
  *
- * <p>Violations throw {@link IllegalArgumentException} today; step 22 will
- * migrate this to {@code DomainValidationException} alongside the user
- * value objects.
+ * <p>Violations throw {@link DomainValidationException} so the web layer can
+ * translate them to HTTP 400 with a single handler.
  *
  * <p>Traces to: §3.a (value objects), §3.b (invariants — audit trail).
  */
@@ -40,19 +39,19 @@ public final class AuditFields {
 
     private AuditFields(Instant createdAt, Instant updatedAt, String createdBy) {
         if (createdBy == null) {
-            throw new IllegalArgumentException("AuditFields createdBy must not be null");
+            throw new DomainValidationException("AuditFields createdBy must not be null");
         }
         if (createdBy.isBlank()) {
-            throw new IllegalArgumentException("AuditFields createdBy must not be blank");
+            throw new DomainValidationException("AuditFields createdBy must not be blank");
         }
         if (createdAt == null) {
-            throw new IllegalArgumentException("AuditFields createdAt must not be null");
+            throw new DomainValidationException("AuditFields createdAt must not be null");
         }
         if (updatedAt == null) {
-            throw new IllegalArgumentException("AuditFields updatedAt must not be null");
+            throw new DomainValidationException("AuditFields updatedAt must not be null");
         }
         if (updatedAt.isBefore(createdAt)) {
-            throw new IllegalArgumentException(
+            throw new DomainValidationException(
                     "AuditFields updatedAt (" + updatedAt + ") must not be before createdAt ("
                             + createdAt + ")");
         }

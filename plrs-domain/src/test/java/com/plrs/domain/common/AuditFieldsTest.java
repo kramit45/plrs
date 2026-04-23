@@ -47,7 +47,7 @@ class AuditFieldsTest {
     @Test
     void rejectsNullCreatedBy() {
         assertThatThrownBy(() -> AuditFields.initial(null, T0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("createdBy")
                 .hasMessageContaining("null");
     }
@@ -55,7 +55,7 @@ class AuditFieldsTest {
     @Test
     void rejectsBlankCreatedBy() {
         assertThatThrownBy(() -> AuditFields.initial("   ", T0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("createdBy")
                 .hasMessageContaining("blank");
     }
@@ -63,7 +63,7 @@ class AuditFieldsTest {
     @Test
     void rejectsNullInstantOnInitial() {
         assertThatThrownBy(() -> AuditFields.initial(ACTOR, (Instant) null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("null");
     }
 
@@ -72,7 +72,7 @@ class AuditFieldsTest {
         AuditFields audit = AuditFields.initial(ACTOR, T0);
 
         assertThatThrownBy(() -> audit.touchedAt(null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("updatedAt")
                 .hasMessageContaining("null");
     }
@@ -83,7 +83,7 @@ class AuditFieldsTest {
         Instant earlier = T0;
 
         assertThatThrownBy(() -> audit.touchedAt(earlier))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("updatedAt")
                 .hasMessageContaining("before");
     }

@@ -1,5 +1,6 @@
 package com.plrs.domain.user;
 
+import com.plrs.domain.common.DomainValidationException;
 import java.util.Arrays;
 
 /**
@@ -24,12 +25,12 @@ public enum Role {
      * "Admin" as synonyms, which would scatter normalisation logic across
      * the codebase.
      *
-     * @throws IllegalArgumentException when {@code name} is null or does
+     * @throws DomainValidationException when {@code name} is null or does
      *     not match any role; the message lists the valid values
      */
     public static Role fromName(String name) {
         if (name == null) {
-            throw new IllegalArgumentException(
+            throw new DomainValidationException(
                     "Role name must not be null; expected one of " + Arrays.toString(values()));
         }
         for (Role role : values()) {
@@ -37,7 +38,7 @@ public enum Role {
                 return role;
             }
         }
-        throw new IllegalArgumentException(
+        throw new DomainValidationException(
                 "Unknown role: '" + name + "'; expected one of " + Arrays.toString(values()));
     }
 }

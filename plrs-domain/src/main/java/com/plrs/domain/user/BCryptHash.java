@@ -1,5 +1,6 @@
 package com.plrs.domain.user;
 
+import com.plrs.domain.common.DomainValidationException;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -29,9 +30,8 @@ import java.util.regex.Pattern;
  * credential material. {@link #value()} returns the full hash for the
  * narrow persistence path that needs it.
  *
- * <p>Violations throw {@link IllegalArgumentException} today; step 22 will
- * migrate this to {@code DomainValidationException} alongside
- * {@code UserId} and {@code Email}.
+ * <p>Violations throw {@link DomainValidationException} so the web layer can
+ * translate them to HTTP 400 with a single handler.
  *
  * <p>Traces to: §3.a (value objects), §7 (BCrypt cost 12).
  */
@@ -51,22 +51,22 @@ public final class BCryptHash {
     /**
      * Wraps a stored BCrypt hash after validating its shape and cost.
      *
-     * @throws IllegalArgumentException when {@code raw} is null, blank,
+     * @throws DomainValidationException when {@code raw} is null, blank,
      *     structurally invalid, or uses a cost below {@link #MIN_COST}
      */
     public static BCryptHash of(String raw) {
         if (raw == null) {
-            throw new IllegalArgumentException("BCryptHash must not be null");
+            throw new DomainValidationException("BCryptHash must not be null");
         }
         if (raw.isBlank()) {
-            throw new IllegalArgumentException("BCryptHash must not be blank");
+            throw new DomainValidationException("BCryptHash must not be blank");
         }
         if (!PATTERN.matcher(raw).matches()) {
-            throw new IllegalArgumentException("BCryptHash is not a valid bcrypt hash");
+            throw new DomainValidationException("BCryptHash is not a valid bcrypt hash");
         }
         int cost = Integer.parseInt(raw.substring(4, 6));
         if (cost < MIN_COST) {
-            throw new IllegalArgumentException(
+            throw new DomainValidationException(
                     "BCryptHash cost must be at least " + MIN_COST + " (was " + cost + ")");
         }
         return new BCryptHash(raw);

@@ -3,6 +3,7 @@ package com.plrs.domain.user;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.plrs.domain.common.DomainValidationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -19,14 +20,14 @@ class PasswordPolicyTest {
     @Test
     void rejectsNull() {
         assertThatThrownBy(() -> PasswordPolicy.validate(null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("null");
     }
 
     @Test
     void rejectsEmptyString() {
         assertThatThrownBy(() -> PasswordPolicy.validate(""))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("blank");
     }
 
@@ -34,28 +35,28 @@ class PasswordPolicyTest {
     @ValueSource(strings = {"   ", "\t", " \n ", "          "})
     void rejectsWhitespaceOnly(String raw) {
         assertThatThrownBy(() -> PasswordPolicy.validate(raw))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("blank");
     }
 
     @Test
     void rejectsShorterThanMinLength() {
         assertThatThrownBy(() -> PasswordPolicy.validate("short01X"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining(String.valueOf(PasswordPolicy.MIN_LENGTH));
     }
 
     @Test
     void rejectsAllDigits() {
         assertThatThrownBy(() -> PasswordPolicy.validate("1234567890"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("letter");
     }
 
     @Test
     void rejectsAllLetters() {
         assertThatThrownBy(() -> PasswordPolicy.validate("abcdefghij"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("digit");
     }
 
@@ -81,7 +82,7 @@ class PasswordPolicyTest {
     })
     void rejectsVariedInvalidPasswords(String raw) {
         assertThatThrownBy(() -> PasswordPolicy.validate(raw))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(DomainValidationException.class);
     }
 
     @Test
@@ -93,7 +94,7 @@ class PasswordPolicyTest {
         String tooShort = "a".repeat(length - 2) + "1"; // length - 1 chars, has letter + digit
 
         assertThatThrownBy(() -> PasswordPolicy.validate(tooShort))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining(String.valueOf(length));
     }
 }

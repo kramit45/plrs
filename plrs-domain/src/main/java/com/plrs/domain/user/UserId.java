@@ -1,5 +1,6 @@
 package com.plrs.domain.user;
 
+import com.plrs.domain.common.DomainValidationException;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -22,10 +23,8 @@ import java.util.UUID;
  *       fighting the record's generated accessors.
  * </ul>
  *
- * <p>Null and invalid inputs throw {@link IllegalArgumentException} today;
- * step 22 will introduce a {@code DomainValidationException} and sweep
- * this together with {@code Email} and {@code BCryptHash} over to the
- * richer exception type.
+ * <p>Null and invalid inputs throw {@link DomainValidationException} so the
+ * web layer can translate them to HTTP 400 with a single handler.
  *
  * <p>Traces to: §3.a (typed IDs — UserId is one of 8 value objects).
  */
@@ -45,11 +44,11 @@ public final class UserId {
     /**
      * Wraps an existing UUID as a UserId.
      *
-     * @throws IllegalArgumentException when {@code value} is null
+     * @throws DomainValidationException when {@code value} is null
      */
     public static UserId of(UUID value) {
         if (value == null) {
-            throw new IllegalArgumentException("UserId value must not be null");
+            throw new DomainValidationException("UserId value must not be null");
         }
         return new UserId(value);
     }
@@ -57,13 +56,17 @@ public final class UserId {
     /**
      * Parses a UUID string into a UserId.
      *
-     * @throws IllegalArgumentException when {@code value} is null or not a valid UUID
+     * @throws DomainValidationException when {@code value} is null or not a valid UUID
      */
     public static UserId of(String value) {
         if (value == null) {
-            throw new IllegalArgumentException("UserId value must not be null");
+            throw new DomainValidationException("UserId value must not be null");
         }
-        return new UserId(UUID.fromString(value));
+        try {
+            return new UserId(UUID.fromString(value));
+        } catch (IllegalArgumentException e) {
+            throw new DomainValidationException("UserId value is not a valid UUID: " + value, e);
+        }
     }
 
     public UUID value() {

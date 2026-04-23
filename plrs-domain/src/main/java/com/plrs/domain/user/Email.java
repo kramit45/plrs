@@ -1,5 +1,6 @@
 package com.plrs.domain.user;
 
+import com.plrs.domain.common.DomainValidationException;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -28,9 +29,8 @@ import java.util.regex.Pattern;
  * consecutive dots. If the project ever needs strict RFC compliance, swap
  * this single regex for a full grammar parser — callers do not see the regex.
  *
- * <p>Null and invalid inputs throw {@link IllegalArgumentException} today;
- * step 22 will introduce a {@code DomainValidationException} and sweep this,
- * {@code UserId} and {@code BCryptHash} over together.
+ * <p>Null and invalid inputs throw {@link DomainValidationException} so the
+ * web layer can translate them to HTTP 400 with a single handler.
  *
  * <p>Traces to: §3.a (value objects), §3.b (invariants — email format).
  */
@@ -50,23 +50,23 @@ public final class Email {
     /**
      * Parses and normalises a raw email string.
      *
-     * @throws IllegalArgumentException with a message naming the violated rule
+     * @throws DomainValidationException with a message naming the violated rule
      *     when {@code raw} is null, blank, too long, or malformed
      */
     public static Email of(String raw) {
         if (raw == null) {
-            throw new IllegalArgumentException("Email must not be null");
+            throw new DomainValidationException("Email must not be null");
         }
         String normalised = raw.trim().toLowerCase();
         if (normalised.isEmpty()) {
-            throw new IllegalArgumentException("Email must not be blank");
+            throw new DomainValidationException("Email must not be blank");
         }
         if (normalised.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException(
+            throw new DomainValidationException(
                     "Email must be at most " + MAX_LENGTH + " characters (RFC 5321)");
         }
         if (!PATTERN.matcher(normalised).matches()) {
-            throw new IllegalArgumentException("Email format is invalid: " + raw);
+            throw new DomainValidationException("Email format is invalid: " + raw);
         }
         return new Email(normalised);
     }

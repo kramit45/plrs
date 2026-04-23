@@ -3,6 +3,7 @@ package com.plrs.domain.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.plrs.domain.common.DomainValidationException;
 import org.junit.jupiter.api.Test;
 
 class EmailTest {
@@ -32,35 +33,35 @@ class EmailTest {
     @Test
     void rejectsNull() {
         assertThatThrownBy(() -> Email.of(null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("null");
     }
 
     @Test
     void rejectsBlank() {
         assertThatThrownBy(() -> Email.of("   "))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("blank");
     }
 
     @Test
     void rejectsMissingAtSign() {
         assertThatThrownBy(() -> Email.of("no-at-sign"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("invalid");
     }
 
     @Test
     void rejectsMissingTopLevelDomain() {
         assertThatThrownBy(() -> Email.of("missing@tld"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("invalid");
     }
 
     @Test
     void rejectsMissingLocalPart() {
         assertThatThrownBy(() -> Email.of("@missing-local.com"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("invalid");
     }
 
@@ -70,7 +71,7 @@ class EmailTest {
         String tooLong = localPart + "@ex.co"; // 250 + 6 = 256 chars
 
         assertThatThrownBy(() -> Email.of(tooLong))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("254");
     }
 

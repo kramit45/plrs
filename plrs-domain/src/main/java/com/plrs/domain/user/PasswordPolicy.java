@@ -1,5 +1,7 @@
 package com.plrs.domain.user;
 
+import com.plrs.domain.common.DomainValidationException;
+
 /**
  * Stateless domain policy for raw passwords. Callers pass the plain string
  * just before hashing so violations surface before anything touches
@@ -12,9 +14,8 @@ package com.plrs.domain.user;
  * forms — {@code BCryptHash} (step 19) owns the hashed representation and
  * application-layer services (step 30) drive the encoder.
  *
- * <p>Violations throw {@link IllegalArgumentException} today; step 22 will
- * migrate this to {@code DomainValidationException} along with the other
- * value objects.
+ * <p>Violations throw {@link DomainValidationException} so the web layer can
+ * translate them to HTTP 400 with a single handler.
  *
  * <p>Traces to: §7 (auth password policy).
  */
@@ -27,18 +28,18 @@ public final class PasswordPolicy {
     /**
      * Validates a raw password against the project's length + complexity rule.
      *
-     * @throws IllegalArgumentException when {@code raw} is null, blank,
+     * @throws DomainValidationException when {@code raw} is null, blank,
      *     shorter than {@link #MIN_LENGTH}, missing a letter, or missing a digit
      */
     public static void validate(String raw) {
         if (raw == null) {
-            throw new IllegalArgumentException("Password must not be null");
+            throw new DomainValidationException("Password must not be null");
         }
         if (raw.isBlank()) {
-            throw new IllegalArgumentException("Password must not be blank");
+            throw new DomainValidationException("Password must not be blank");
         }
         if (raw.length() < MIN_LENGTH) {
-            throw new IllegalArgumentException(
+            throw new DomainValidationException(
                     "Password must be at least " + MIN_LENGTH + " characters");
         }
 
@@ -57,8 +58,8 @@ public final class PasswordPolicy {
         }
 
         if (!hasLetter) {
-            throw new IllegalArgumentException("Password must contain at least one letter");
+            throw new DomainValidationException("Password must contain at least one letter");
         }
-        throw new IllegalArgumentException("Password must contain at least one digit");
+        throw new DomainValidationException("Password must contain at least one digit");
     }
 }

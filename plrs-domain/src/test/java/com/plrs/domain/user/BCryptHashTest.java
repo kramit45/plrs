@@ -3,6 +3,7 @@ package com.plrs.domain.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.plrs.domain.common.DomainValidationException;
 import org.junit.jupiter.api.Test;
 
 class BCryptHashTest {
@@ -32,14 +33,14 @@ class BCryptHashTest {
     @Test
     void rejectsNull() {
         assertThatThrownBy(() -> BCryptHash.of(null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("null");
     }
 
     @Test
     void rejectsBlank() {
         assertThatThrownBy(() -> BCryptHash.of("   "))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("blank");
     }
 
@@ -48,7 +49,7 @@ class BCryptHashTest {
         String wrongPrefix = "$2c$12$" + VALID_SALT + VALID_HASH_TAIL;
 
         assertThatThrownBy(() -> BCryptHash.of(wrongPrefix))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("bcrypt");
     }
 
@@ -57,7 +58,7 @@ class BCryptHashTest {
         String truncated = VALID.substring(0, VALID.length() - 1); // 59 chars
 
         assertThatThrownBy(() -> BCryptHash.of(truncated))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("bcrypt");
     }
 
@@ -66,7 +67,7 @@ class BCryptHashTest {
         String cost10 = "$2b$10$" + VALID_SALT + VALID_HASH_TAIL;
 
         assertThatThrownBy(() -> BCryptHash.of(cost10))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("cost")
                 .hasMessageContaining("12");
     }
@@ -77,7 +78,7 @@ class BCryptHashTest {
         String bad = "$2b$12$" + badSalt + VALID_HASH_TAIL;
 
         assertThatThrownBy(() -> BCryptHash.of(bad))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(DomainValidationException.class);
     }
 
     @Test

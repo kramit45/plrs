@@ -3,6 +3,7 @@ package com.plrs.domain.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.plrs.domain.common.DomainValidationException;
 import org.junit.jupiter.api.Test;
 
 class RoleTest {
@@ -23,7 +24,7 @@ class RoleTest {
     @Test
     void fromNameIsCaseSensitive() {
         assertThatThrownBy(() -> Role.fromName("admin"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("admin")
                 .hasMessageContaining("STUDENT")
                 .hasMessageContaining("INSTRUCTOR")
@@ -33,14 +34,14 @@ class RoleTest {
     @Test
     void fromNameRejectsNull() {
         assertThatThrownBy(() -> Role.fromName(null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("null");
     }
 
     @Test
     void fromNameRejectsUnknown() {
         assertThatThrownBy(() -> Role.fromName("UNKNOWN"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("UNKNOWN")
                 .hasMessageContaining("STUDENT")
                 .hasMessageContaining("INSTRUCTOR")
