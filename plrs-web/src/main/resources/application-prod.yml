@@ -2,6 +2,12 @@
 # PLRS_JWT_PRIVATE_KEY_PEM / PLRS_JWT_PUBLIC_KEY_PEM; an ephemeral
 # keypair is never acceptable in prod because it would invalidate every
 # issued token on each restart.
+#
+# PLRS_ALLOWED_ORIGINS is mandatory — startup fails fast without it
+# rather than silently falling back to a dev-only default that would
+# open the API up cross-origin.
 plrs:
   jwt:
     generate-if-missing: false
+  cors:
+    allowed-origins: ${PLRS_ALLOWED_ORIGINS}

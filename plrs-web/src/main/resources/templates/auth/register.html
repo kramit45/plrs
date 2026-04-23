@@ -14,10 +14,6 @@
                          th:text="${flashSuccess}">Registered.</div>
 
                     <form th:action="@{/register}" th:object="${form}" method="post" novalidate>
-                        <input type="hidden"
-                               th:name="${_csrf != null ? _csrf.parameterName : '_csrf_placeholder'}"
-                               th:value="${_csrf != null ? _csrf.token : ''}"/>
-
                         <div th:if="${#fields.hasGlobalErrors()}"
                              class="alert alert-danger" role="alert">
                             <ul class="mb-0">
