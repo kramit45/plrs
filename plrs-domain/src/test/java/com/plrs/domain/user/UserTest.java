@@ -142,4 +142,82 @@ class UserTest {
         assertThat(rendered).contains(user.id().toString());
         assertThat(rendered).contains(EMAIL.value());
     }
+
+    @Test
+    void assignRoleAddsRoleAndReturnsNewUser() {
+        User student = User.register(EMAIL, HASH, CLOCK, CREATOR);
+
+        User instructor = student.assignRole(Role.INSTRUCTOR, CLOCK);
+
+        assertThat(instructor.roles()).containsExactlyInAnyOrder(Role.STUDENT, Role.INSTRUCTOR);
+        assertThat(instructor).isNotSameAs(student);
+        assertThat(instructor.id()).isEqualTo(student.id());
+        assertThat(instructor.email()).isEqualTo(student.email());
+        assertThat(instructor.passwordHash()).isEqualTo(student.passwordHash());
+    }
+
+    @Test
+    void assignRoleIsIdempotentWhenRoleAlreadyHeld() {
+        User student = User.register(EMAIL, HASH, CLOCK, CREATOR);
+
+        User result = student.assignRole(Role.STUDENT, CLOCK);
+
+        assertThat(result).isSameAs(student);
+    }
+
+    @Test
+    void assignRoleChainsToBuildUpMultipleRoles() {
+        User student = User.register(EMAIL, HASH, CLOCK, CREATOR);
+
+        User full = student.assignRole(Role.INSTRUCTOR, CLOCK).assignRole(Role.ADMIN, CLOCK);
+
+        assertThat(full.roles())
+                .containsExactlyInAnyOrder(Role.STUDENT, Role.INSTRUCTOR, Role.ADMIN);
+    }
+
+    @Test
+    void assignRoleRejectsNullRole() {
+        User student = User.register(EMAIL, HASH, CLOCK, CREATOR);
+
+        assertThatThrownBy(() -> student.assignRole(null, CLOCK))
+                .isInstanceOf(DomainValidationException.class)
+                .hasMessageContaining("Role");
+    }
+
+    @Test
+    void assignRoleAdvancesUpdatedAtOnNewRole() {
+        Instant t1 = T0;
+        Instant t2 = T0.plusSeconds(3600);
+        Clock atT1 = Clock.fixed(t1, ZoneOffset.UTC);
+        Clock atT2 = Clock.fixed(t2, ZoneOffset.UTC);
+
+        User student = User.register(EMAIL, HASH, atT1, CREATOR);
+        User promoted = student.assignRole(Role.INSTRUCTOR, atT2);
+
+        assertThat(promoted.audit().createdAt()).isEqualTo(t1);
+        assertThat(promoted.audit().updatedAt()).isEqualTo(t2);
+    }
+
+    @Test
+    void assignRoleLeavesAuditUntouchedOnIdempotentCall() {
+        Instant t1 = T0;
+        Instant t2 = T0.plusSeconds(3600);
+        Clock atT1 = Clock.fixed(t1, ZoneOffset.UTC);
+        Clock atT2 = Clock.fixed(t2, ZoneOffset.UTC);
+
+        User student = User.register(EMAIL, HASH, atT1, CREATOR);
+        User result = student.assignRole(Role.STUDENT, atT2);
+
+        assertThat(result.audit().updatedAt()).isEqualTo(t1);
+    }
+
+    @Test
+    void assignRoleDoesNotMutateOriginalUser() {
+        User student = User.register(EMAIL, HASH, CLOCK, CREATOR);
+
+        User promoted = student.assignRole(Role.ADMIN, CLOCK);
+
+        assertThat(student.roles()).containsExactly(Role.STUDENT);
+        assertThat(promoted.roles()).containsExactlyInAnyOrder(Role.STUDENT, Role.ADMIN);
+    }
 }

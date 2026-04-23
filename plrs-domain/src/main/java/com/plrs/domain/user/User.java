@@ -4,6 +4,7 @@ import com.plrs.domain.common.AuditFields;
 import com.plrs.domain.common.DomainInvariantException;
 import com.plrs.domain.common.DomainValidationException;
 import java.time.Clock;
+import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -136,6 +137,31 @@ public final class User {
 
     public AuditFields audit() {
         return audit;
+    }
+
+    /**
+     * Returns a user with {@code role} added to the role set.
+     *
+     * <p>Additive — existing roles are never removed, matching the §7
+     * additive role model. Idempotent — if the user already holds the
+     * role, the receiver is returned unchanged (same instance, audit
+     * timestamps untouched), so callers can invoke this on every login
+     * without producing spurious "updated" audit entries.
+     *
+     * <p>Traces to: §7 (additive role model).
+     *
+     * @throws DomainValidationException when {@code role} is null
+     */
+    public User assignRole(Role role, Clock clock) {
+        if (role == null) {
+            throw new DomainValidationException("Role must not be null");
+        }
+        if (roles.contains(role)) {
+            return this;
+        }
+        Set<Role> next = EnumSet.copyOf(roles);
+        next.add(role);
+        return new User(id, email, passwordHash, next, audit.touched(clock));
     }
 
     @Override
