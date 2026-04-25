@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "plrs-ml"
+version = "0.3.0"
+description = "PLRS ML microservice"
+authors = ["Kumar Amit <krp.amit@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "plrs_ml" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.110"
+uvicorn = { extras = ["standard"], version = "^0.27" }
+pydantic = "^2.6"
+pydantic-settings = "^2.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+pytest-asyncio = "^0.23"
+httpx = "^0.27"
+ruff = "^0.3"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
