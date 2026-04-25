@@ -16,6 +16,19 @@ poetry run ruff check .
 poetry run uvicorn plrs_ml.main:app --reload
 ```
 
+## Docker / docker-compose
+
+```bash
+docker build -t plrs-ml ./plrs-ml
+# or, from the repo root, bring up the full stack:
+docker-compose up plrs-ml
+curl http://localhost:8000/health   # → {"status":"UP",...}
+```
+
+`docker-compose up` starts Postgres, Redis, and plrs-ml; the
+service joins the compose network so Postgres is reachable at
+`postgres:5432` and Redis at `redis:6379`.
+
 ## Configuration
 
 All settings are environment-driven, prefixed with `PLRS_ML_`:

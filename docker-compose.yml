@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: plrs
+      POSTGRES_USER: plrs
+      POSTGRES_PASSWORD: plrs
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plrs -d plrs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  plrs-ml:
+    build: ./plrs-ml
+    ports:
+      - "8000:8000"
+    environment:
+      PLRS_ML_OPS_DB_URL: postgresql://plrs:plrs@postgres:5432/plrs
+      PLRS_ML_REDIS_URL: redis://redis:6379/0
+      PLRS_ML_HMAC_SECRET: ${PLRS_ML_HMAC_SECRET:-dev-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
