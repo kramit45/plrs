@@ -4,10 +4,12 @@ import com.plrs.domain.common.AuditFields;
 import com.plrs.domain.content.Content;
 import com.plrs.domain.content.ContentDraft;
 import com.plrs.domain.content.ContentId;
+import com.plrs.domain.quiz.QuizItem;
 import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
 import com.plrs.infrastructure.user.AuditFieldsEmbeddable;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -50,6 +52,29 @@ public class ContentMapper {
                 new HashSet<>(entity.getTags()),
                 Optional.ofNullable(entity.getCreatedBy()).map(UserId::of),
                 toAuditFields(entity.getAudit()));
+    }
+
+    /**
+     * Quiz overload — uses the 12-arg {@link Content#rehydrate} so
+     * downstream {@code Content.score} has the items it needs to score.
+     */
+    public Content toDomain(ContentJpaEntity entity, List<QuizItem> quizItems) {
+        if (entity == null) {
+            return null;
+        }
+        return Content.rehydrate(
+                ContentId.of(entity.getId()),
+                TopicId.of(entity.getTopicId()),
+                entity.getTitle(),
+                entity.getCtype(),
+                entity.getDifficulty(),
+                entity.getEstMinutes(),
+                entity.getUrl(),
+                Optional.ofNullable(entity.getDescription()),
+                new HashSet<>(entity.getTags()),
+                Optional.ofNullable(entity.getCreatedBy()).map(UserId::of),
+                toAuditFields(entity.getAudit()),
+                quizItems);
     }
 
     public ContentJpaEntity toEntity(Content content) {

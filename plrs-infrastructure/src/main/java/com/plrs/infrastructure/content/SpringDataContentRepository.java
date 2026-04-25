@@ -4,9 +4,17 @@ import com.plrs.domain.content.Content;
 import com.plrs.domain.content.ContentDraft;
 import com.plrs.domain.content.ContentId;
 import com.plrs.domain.content.ContentRepository;
+import com.plrs.domain.content.ContentType;
 import com.plrs.domain.content.SearchPage;
+import com.plrs.domain.quiz.QuizItem;
+import com.plrs.domain.quiz.QuizItemOption;
 import com.plrs.domain.topic.TopicId;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -52,6 +60,8 @@ public class SpringDataContentRepository implements ContentRepository {
     private final ContentJpaRepository jpa;
     private final ContentMapper mapper;
 
+    @PersistenceContext private EntityManager em;
+
     public SpringDataContentRepository(ContentJpaRepository jpa, ContentMapper mapper) {
         this.jpa = jpa;
         this.mapper = mapper;
@@ -65,7 +75,86 @@ public class SpringDataContentRepository implements ContentRepository {
 
     @Override
     public Optional<Content> findById(ContentId id) {
-        return jpa.findById(id.value()).map(mapper::toDomain);
+        return jpa.findById(id.value()).map(this::hydrate);
+    }
+
+    /**
+     * For ctype=QUIZ content, fetches quiz_items + quiz_item_options via
+     * a single native join and rehydrates the aggregate through the
+     * 12-arg {@link Content#rehydrate} variant. For non-QUIZ content,
+     * delegates to {@link ContentMapper#toDomain(ContentJpaEntity)}.
+     */
+    private Content hydrate(ContentJpaEntity entity) {
+        if (entity.getCtype() != ContentType.QUIZ) {
+            return mapper.toDomain(entity);
+        }
+        return mapper.toDomain(entity, loadQuizItems(entity.getId()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<QuizItem> loadQuizItems(Long contentId) {
+        List<Object[]> rows =
+                em.createNativeQuery(
+                                "SELECT qi.item_order, qi.topic_id, qi.stem, qi.explanation,"
+                                        + "       qo.option_order, qo.option_text, qo.is_correct"
+                                        + " FROM plrs_ops.quiz_items qi"
+                                        + " JOIN plrs_ops.quiz_item_options qo"
+                                        + "   ON qo.content_id = qi.content_id"
+                                        + "  AND qo.item_order = qi.item_order"
+                                        + " WHERE qi.content_id = :contentId"
+                                        + " ORDER BY qi.item_order ASC, qo.option_order ASC")
+                        .setParameter("contentId", contentId)
+                        .getResultList();
+
+        // Group rows by itemOrder, preserving insertion order so the
+        // resulting List<QuizItem> matches item_order ASC.
+        Map<Integer, ItemBuilder> byItemOrder = new LinkedHashMap<>();
+        for (Object[] row : rows) {
+            int itemOrder = ((Number) row[0]).intValue();
+            ItemBuilder b =
+                    byItemOrder.computeIfAbsent(
+                            itemOrder,
+                            order -> {
+                                Long topicId = ((Number) row[1]).longValue();
+                                String stem = (String) row[2];
+                                String explanation = (String) row[3];
+                                return new ItemBuilder(order, topicId, stem, explanation);
+                            });
+            b.options.add(
+                    new QuizItemOption(
+                            ((Number) row[4]).intValue(),
+                            (String) row[5],
+                            (Boolean) row[6]));
+        }
+        List<QuizItem> items = new ArrayList<>(byItemOrder.size());
+        for (ItemBuilder b : byItemOrder.values()) {
+            items.add(b.build());
+        }
+        return items;
+    }
+
+    private static final class ItemBuilder {
+        final int itemOrder;
+        final Long topicId;
+        final String stem;
+        final String explanation;
+        final List<QuizItemOption> options = new ArrayList<>();
+
+        ItemBuilder(int itemOrder, Long topicId, String stem, String explanation) {
+            this.itemOrder = itemOrder;
+            this.topicId = topicId;
+            this.stem = stem;
+            this.explanation = explanation;
+        }
+
+        QuizItem build() {
+            return QuizItem.of(
+                    itemOrder,
+                    com.plrs.domain.topic.TopicId.of(topicId),
+                    stem,
+                    Optional.ofNullable(explanation),
+                    options);
+        }
     }
 
     @Override

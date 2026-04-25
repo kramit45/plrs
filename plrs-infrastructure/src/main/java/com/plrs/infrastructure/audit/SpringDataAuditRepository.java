@@ -6,6 +6,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Adapter implementing {@link AuditRepository} on top of
@@ -22,7 +24,16 @@ public class SpringDataAuditRepository implements AuditRepository {
 
     @PersistenceContext private EntityManager em;
 
+    /**
+     * {@code Propagation.REQUIRED} so the append joins the audited
+     * method's transaction when one exists (atomic with the business
+     * write — TX-01 family) and opens its own otherwise. Without this,
+     * audited use cases that aren't themselves {@code @Transactional}
+     * (e.g. RegisterUserUseCase, LoginUseCase) hit Hibernate's
+     * "Executing an update/delete query" guard.
+     */
     @Override
+    @Transactional(propagation = Propagation.REQUIRED)
     public void append(AuditEvent event) {
         // Use ::jsonb cast for detail_json so the column type is honoured
         // when the value is non-null. NULL values are typed implicitly via

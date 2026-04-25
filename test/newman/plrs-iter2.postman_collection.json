@@ -54,8 +54,8 @@
             "exec": [
               "pm.test('Status 201', () => pm.response.to.have.status(201));",
               "const body = pm.response.json();",
-              "pm.test('Body has topicId', () => pm.expect(body.topicId).to.be.a('number'));",
-              "pm.environment.set('newTopicId', body.topicId);"
+              "pm.test('Body has id', () => pm.expect(body.id).to.be.a('number'));",
+              "pm.environment.set('newTopicId', body.id);"
             ]
           }
         }
@@ -96,8 +96,8 @@
             "exec": [
               "pm.test('Status 201', () => pm.response.to.have.status(201));",
               "const body = pm.response.json();",
-              "pm.test('Body has contentId', () => pm.expect(body.contentId).to.be.a('number'));",
-              "pm.environment.set('newVideoContentId', body.contentId);"
+              "pm.test('Body has id', () => pm.expect(body.id).to.be.a('number'));",
+              "pm.environment.set('newVideoContentId', body.id);"
             ]
           }
         }
