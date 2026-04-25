@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
-public final class RecordInteractionUseCase {
+public class RecordInteractionUseCase {
 
     static final Duration VIEW_DEBOUNCE_WINDOW = Duration.ofMinutes(10);
 

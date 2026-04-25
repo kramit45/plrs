@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
-public final class AddPrerequisiteUseCase {
+public class AddPrerequisiteUseCase {
 
     private static final long BACKOFF_MIN_MS = 50L;
     private static final int BACKOFF_JITTER_MS = 50;

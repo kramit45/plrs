@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
-public final class CreateTopicUseCase {
+public class CreateTopicUseCase {
 
     private final TopicRepository topicRepository;
     private final Clock clock;

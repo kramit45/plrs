@@ -31,7 +31,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
-public final class WeeklyActivityService {
+public class WeeklyActivityService {
 
     /** Number of ISO weeks the sparkline covers. */
     public static final int WEEKS_BACK = 8;

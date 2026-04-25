@@ -40,7 +40,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
-public final class StudentDashboardService {
+public class StudentDashboardService {
 
     static final int TOP_N_MASTERY = 6;
     static final int RECENT_COMPLETES_LIMIT = 5;

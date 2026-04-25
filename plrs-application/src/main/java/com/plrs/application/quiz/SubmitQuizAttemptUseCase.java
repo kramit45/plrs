@@ -63,7 +63,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
 @Transactional
-public final class SubmitQuizAttemptUseCase {
+public class SubmitQuizAttemptUseCase {
 
     /**
      * Base learning rate for the EWMA update (§3.c.5.7). The per-topic

@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
-public final class CreateContentUseCase {
+public class CreateContentUseCase {
 
     private final ContentRepository contentRepository;
     private final TopicRepository topicRepository;
