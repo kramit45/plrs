@@ -1,11 +1,18 @@
 package com.plrs.web.common;
 
+import com.plrs.application.content.ContentNotFoundException;
+import com.plrs.application.content.ContentTitleNotUniqueException;
 import com.plrs.application.security.InvalidTokenException;
+import com.plrs.application.topic.TopicAlreadyExistsException;
+import com.plrs.application.topic.TopicNotFoundException;
 import com.plrs.application.user.EmailAlreadyRegisteredException;
 import com.plrs.application.user.InvalidCredentialsException;
 import com.plrs.domain.common.DomainValidationException;
+import com.plrs.domain.content.ContentId;
+import com.plrs.domain.content.CycleDetectedException;
 import java.net.URI;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -69,6 +77,94 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "domain-validation",
                 "Validation failed",
+                e.getMessage());
+    }
+
+    @ExceptionHandler(TopicAlreadyExistsException.class)
+    public ProblemDetail handleTopicAlreadyExists(TopicAlreadyExistsException e) {
+        ProblemDetail p =
+                problem(
+                        HttpStatus.CONFLICT,
+                        "topic-already-exists",
+                        "Topic already exists",
+                        e.getMessage());
+        p.setProperty("name", e.name());
+        return p;
+    }
+
+    @ExceptionHandler(TopicNotFoundException.class)
+    public ProblemDetail handleTopicNotFound(TopicNotFoundException e) {
+        ProblemDetail p =
+                problem(
+                        HttpStatus.NOT_FOUND,
+                        "topic-not-found",
+                        "Topic not found",
+                        e.getMessage());
+        if (e.topicId() != null) {
+            p.setProperty("topicId", e.topicId().value());
+        }
+        return p;
+    }
+
+    @ExceptionHandler(ContentNotFoundException.class)
+    public ProblemDetail handleContentNotFound(ContentNotFoundException e) {
+        ProblemDetail p =
+                problem(
+                        HttpStatus.NOT_FOUND,
+                        "content-not-found",
+                        "Content not found",
+                        e.getMessage());
+        if (e.contentId() != null) {
+            p.setProperty("contentId", e.contentId().value());
+        }
+        return p;
+    }
+
+    @ExceptionHandler(ContentTitleNotUniqueException.class)
+    public ProblemDetail handleContentTitleNotUnique(ContentTitleNotUniqueException e) {
+        ProblemDetail p =
+                problem(
+                        HttpStatus.CONFLICT,
+                        "content-title-not-unique",
+                        "Content title not unique within topic",
+                        e.getMessage());
+        if (e.topicId() != null) {
+            p.setProperty("topicId", e.topicId().value());
+        }
+        // Property is named "contentTitle" (not "title") to avoid colliding
+        // with ProblemDetail's standard title field on serialisation.
+        p.setProperty("contentTitle", e.title());
+        return p;
+    }
+
+    @ExceptionHandler(CycleDetectedException.class)
+    public ProblemDetail handleCycleDetected(CycleDetectedException e) {
+        ProblemDetail p =
+                problem(
+                        HttpStatus.CONFLICT,
+                        "cycle-detected",
+                        "Prerequisite cycle detected",
+                        e.getMessage());
+        List<Long> path = e.cyclePath().stream().map(ContentId::value).toList();
+        p.setProperty("cyclePath", path);
+        return p;
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException e) {
+        return problem(
+                HttpStatus.FORBIDDEN,
+                "access-denied",
+                "Forbidden",
+                "You do not have permission to perform this action");
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException e) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                "invalid-argument",
+                "Invalid argument",
                 e.getMessage());
     }
 
