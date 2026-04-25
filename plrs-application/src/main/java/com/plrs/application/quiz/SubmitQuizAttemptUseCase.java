@@ -2,6 +2,7 @@ package com.plrs.application.quiz;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.plrs.application.cache.TopNCache;
 import com.plrs.application.content.ContentNotFoundException;
 import com.plrs.application.outbox.OutboxEvent;
 import com.plrs.application.outbox.OutboxRepository;
@@ -27,6 +28,8 @@ import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Submits one quiz attempt and applies the full TX-01 transactional
@@ -45,9 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
  *       increase, §3.b.5.3).
  *   <li>Insert one {@code QUIZ_ATTEMPTED} outbox event so downstream
  *       consumers see the change after commit (§2.e.3.6).
+ *   <li>Register a {@code TransactionSynchronization.afterCommit} hook
+ *       that invalidates the per-user top-N cache (TX-04, step 91).
+ *       Best-effort — the {@code user_skills_version} bump is the
+ *       authoritative invariant (§2.e.2.3.3).
  * </ol>
- *
- * <p>Cache invalidation is post-commit best-effort and is wired in step 91.
  *
  * <p>Gated by {@code @ConditionalOnProperty("spring.datasource.url")}
  * so the bean is not created for the no-DB smoke test.
@@ -71,6 +76,7 @@ public final class SubmitQuizAttemptUseCase {
     private final UserRepository userRepository;
     private final OutboxRepository outboxRepository;
     private final AdvisoryLockService lockService;
+    private final TopNCache topNCache;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -81,6 +87,7 @@ public final class SubmitQuizAttemptUseCase {
             UserRepository userRepository,
             OutboxRepository outboxRepository,
             AdvisoryLockService lockService,
+            TopNCache topNCache,
             ObjectMapper objectMapper,
             Clock clock) {
         this.contentRepository = contentRepository;
@@ -89,6 +96,7 @@ public final class SubmitQuizAttemptUseCase {
         this.userRepository = userRepository;
         this.outboxRepository = outboxRepository;
         this.lockService = lockService;
+        this.topNCache = topNCache;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -141,6 +149,8 @@ public final class SubmitQuizAttemptUseCase {
                         serialiseEventPayload(persisted, attempt, deltas),
                         now));
 
+        registerCacheInvalidationOnCommit(userId);
+
         return new SubmitQuizAttemptResult(
                 persisted.attemptId(),
                 attempt.score(),
@@ -171,6 +181,22 @@ public final class SubmitQuizAttemptUseCase {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialise QUIZ_ATTEMPTED payload", e);
+        }
+    }
+
+    private void registerCacheInvalidationOnCommit(UserId userId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            topNCache.invalidate(userId);
+                        }
+                    });
+        } else {
+            // No active transaction — invalidate immediately. The
+            // adapter swallows Redis failures, so this never throws.
+            topNCache.invalidate(userId);
         }
     }
 }

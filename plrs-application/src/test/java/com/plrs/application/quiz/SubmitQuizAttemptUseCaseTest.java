@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.plrs.application.cache.TopNCache;
 import com.plrs.application.content.ContentNotFoundException;
 import com.plrs.application.outbox.OutboxEvent;
 import com.plrs.application.outbox.OutboxRepository;
@@ -51,6 +52,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class SubmitQuizAttemptUseCaseTest {
@@ -69,6 +71,7 @@ class SubmitQuizAttemptUseCaseTest {
     @Mock private UserRepository userRepository;
     @Mock private OutboxRepository outboxRepository;
     @Mock private AdvisoryLockService lockService;
+    @Mock private TopNCache topNCache;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -84,8 +87,16 @@ class SubmitQuizAttemptUseCaseTest {
                         userRepository,
                         outboxRepository,
                         lockService,
+                        topNCache,
                         objectMapper,
                         CLOCK);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearTxSync() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clear();
+        }
     }
 
     private static QuizItem item(int order, TopicId topic, int correctOption) {
@@ -427,5 +438,42 @@ class SubmitQuizAttemptUseCaseTest {
         useCase.handle(bothCorrect());
 
         verify(lockService).acquireLock(eq("quiz:" + USER_UUID + ":" + QUIZ_ID.value()));
+    }
+
+    @Test
+    void cacheInvalidationFiresAfterCommitWhenSyncActive() {
+        // Initialise synchronization the way Spring's @Transactional
+        // would, then invoke the use case. The hook must be deferred
+        // until afterCommit — verify it has NOT yet been called when
+        // handle() returns, then trigger commit and verify it fires.
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            stubHappyPath(singleTopicQuiz());
+
+            useCase.handle(bothCorrect());
+            verify(topNCache, never()).invalidate(any());
+
+            // Simulate commit by invoking afterCommit on every
+            // registered synchronization, the way
+            // AbstractPlatformTransactionManager does.
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(s -> s.afterCommit());
+
+            verify(topNCache).invalidate(USER_ID);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void cacheInvalidationFiresImmediatelyWhenNoTransaction() {
+        // No active synchronization (no surrounding @Transactional) —
+        // the use case still invalidates eagerly so callers from
+        // test/admin paths don't silently leak a stale cache.
+        stubHappyPath(singleTopicQuiz());
+
+        useCase.handle(bothCorrect());
+
+        verify(topNCache).invalidate(USER_ID);
     }
 }
