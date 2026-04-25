@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.plrs.domain.content.ContentId;
 import com.plrs.domain.quiz.PerItemFeedback;
+import com.plrs.domain.quiz.PersistedQuizAttempt;
 import com.plrs.domain.quiz.QuizAttempt;
 import com.plrs.domain.quiz.QuizAttemptRepository;
 import com.plrs.domain.topic.TopicId;
@@ -119,7 +120,7 @@ class SpringDataQuizAttemptRepositoryIT extends PostgresTestBase {
     }
 
     @Test
-    void saveReturnsAttemptValueEqualToInput() {
+    void saveReturnsPersistedQuizAttemptWithAssignedId() {
         QuizAttempt attempt =
                 buildAttempt(
                         Instant.parse("2026-04-25T10:00:00Z"),
@@ -127,14 +128,16 @@ class SpringDataQuizAttemptRepositoryIT extends PostgresTestBase {
                         1,
                         2);
 
-        QuizAttempt saved = quizAttemptRepository.save(attempt);
+        PersistedQuizAttempt saved = quizAttemptRepository.save(attempt);
         em.flush();
 
-        assertThat(saved.score()).isEqualByComparingTo("50.00");
-        assertThat(saved.correctCount()).isEqualTo(1);
-        assertThat(saved.totalCount()).isEqualTo(2);
-        assertThat(saved.userId()).isEqualTo(userId);
-        assertThat(saved.quizContentId()).isEqualTo(quizContentId);
+        assertThat(saved.attemptId()).isNotNull();
+        assertThat(saved.attemptId()).isPositive();
+        assertThat(saved.attempt().score()).isEqualByComparingTo("50.00");
+        assertThat(saved.attempt().correctCount()).isEqualTo(1);
+        assertThat(saved.attempt().totalCount()).isEqualTo(2);
+        assertThat(saved.attempt().userId()).isEqualTo(userId);
+        assertThat(saved.attempt().quizContentId()).isEqualTo(quizContentId);
     }
 
     @Test
@@ -160,14 +163,16 @@ class SpringDataQuizAttemptRepositoryIT extends PostgresTestBase {
                                 .getSingleResult())
                         .longValue();
 
-        QuizAttempt loaded = quizAttemptRepository.findById(attemptId).orElseThrow();
+        PersistedQuizAttempt loaded =
+                quizAttemptRepository.findById(attemptId).orElseThrow();
 
-        assertThat(loaded.score()).isEqualByComparingTo("50.00");
-        assertThat(loaded.correctCount()).isEqualTo(1);
-        assertThat(loaded.totalCount()).isEqualTo(2);
-        assertThat(loaded.perItemFeedback()).hasSize(2);
-        assertThat(loaded.perItemFeedback().get(0).isCorrect()).isTrue();
-        assertThat(loaded.perItemFeedback().get(1).isCorrect()).isFalse();
+        assertThat(loaded.attemptId()).isEqualTo(attemptId);
+        assertThat(loaded.attempt().score()).isEqualByComparingTo("50.00");
+        assertThat(loaded.attempt().correctCount()).isEqualTo(1);
+        assertThat(loaded.attempt().totalCount()).isEqualTo(2);
+        assertThat(loaded.attempt().perItemFeedback()).hasSize(2);
+        assertThat(loaded.attempt().perItemFeedback().get(0).isCorrect()).isTrue();
+        assertThat(loaded.attempt().perItemFeedback().get(1).isCorrect()).isFalse();
     }
 
     @Test
@@ -205,11 +210,12 @@ class SpringDataQuizAttemptRepositoryIT extends PostgresTestBase {
                 buildAttempt(t0.plusSeconds(120), new BigDecimal("30.00"), 1, 2));
         em.flush();
 
-        List<QuizAttempt> recent = quizAttemptRepository.findRecentByUser(userId, 2);
+        List<PersistedQuizAttempt> recent =
+                quizAttemptRepository.findRecentByUser(userId, 2);
 
         assertThat(recent).hasSize(2);
-        assertThat(recent.get(0).score()).isEqualByComparingTo("30.00");
-        assertThat(recent.get(1).score()).isEqualByComparingTo("20.00");
+        assertThat(recent.get(0).attempt().score()).isEqualByComparingTo("30.00");
+        assertThat(recent.get(1).attempt().score()).isEqualByComparingTo("20.00");
     }
 
     @Test

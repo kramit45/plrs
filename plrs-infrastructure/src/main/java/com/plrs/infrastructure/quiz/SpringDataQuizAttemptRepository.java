@@ -1,6 +1,7 @@
 package com.plrs.infrastructure.quiz;
 
 import com.plrs.domain.content.ContentId;
+import com.plrs.domain.quiz.PersistedQuizAttempt;
 import com.plrs.domain.quiz.QuizAttempt;
 import com.plrs.domain.quiz.QuizAttemptRepository;
 import com.plrs.domain.user.UserId;
@@ -14,7 +15,9 @@ import org.springframework.stereotype.Repository;
  * Adapter implementing {@link QuizAttemptRepository} on top of Spring
  * Data JPA. Delegates CRUD and the recent-attempts query to
  * {@link QuizAttemptJpaRepository}; the JSONB {@code per_item_json}
- * round-trip is handled by {@link QuizAttemptMapper}.
+ * round-trip is handled by {@link QuizAttemptMapper}; results are
+ * wrapped in {@link PersistedQuizAttempt} so callers can reach the
+ * surrogate {@code attempt_id}.
  *
  * <p>Not declared {@code final}: Spring Boot's observation /
  * AbstractAdvisingBeanPostProcessor CGLIB-subclasses every
@@ -39,33 +42,34 @@ public class SpringDataQuizAttemptRepository implements QuizAttemptRepository {
     }
 
     @Override
-    public QuizAttempt save(QuizAttempt attempt) {
+    public PersistedQuizAttempt save(QuizAttempt attempt) {
         QuizAttemptJpaEntity saved = jpa.save(mapper.toEntity(attempt));
-        return mapper.toDomain(saved);
+        return new PersistedQuizAttempt(saved.getAttemptId(), mapper.toDomain(saved));
     }
 
     @Override
-    public Optional<QuizAttempt> findById(Long attemptId) {
-        return jpa.findById(attemptId).map(mapper::toDomain);
+    public Optional<PersistedQuizAttempt> findById(Long attemptId) {
+        return jpa.findById(attemptId)
+                .map(e -> new PersistedQuizAttempt(e.getAttemptId(), mapper.toDomain(e)));
     }
 
     @Override
-    public List<QuizAttempt> findRecentByUser(UserId userId, int limit) {
+    public List<PersistedQuizAttempt> findRecentByUser(UserId userId, int limit) {
         return jpa
                 .findByUserIdOrderByAttemptedAtDesc(
                         userId.value(), PageRequest.of(0, limit))
                 .stream()
-                .map(mapper::toDomain)
+                .map(e -> new PersistedQuizAttempt(e.getAttemptId(), mapper.toDomain(e)))
                 .toList();
     }
 
     @Override
-    public List<QuizAttempt> findByUserAndContent(UserId userId, ContentId contentId) {
+    public List<PersistedQuizAttempt> findByUserAndContent(UserId userId, ContentId contentId) {
         return jpa
                 .findByUserIdAndContentIdOrderByAttemptedAtAsc(
                         userId.value(), contentId.value())
                 .stream()
-                .map(mapper::toDomain)
+                .map(e -> new PersistedQuizAttempt(e.getAttemptId(), mapper.toDomain(e)))
                 .toList();
     }
 
