@@ -36,3 +36,39 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  plrs-etl-worker:
+    build: ./plrs-etl-worker
+    environment:
+      PLRS_ETL_BOOTSTRAP_SERVERS: kafka:9092
+      PLRS_ETL_DW_DB_URL: postgresql://plrs:plrs@postgres:5432/plrs
+      PLRS_ETL_TOPIC: plrs.interactions
+      PLRS_ETL_GROUP_ID: plrs-etl
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy

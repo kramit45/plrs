@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "plrs-etl-worker"
+version = "0.3.0"
+description = "PLRS ETL worker — drains plrs.interactions Kafka topic into plrs_dw.fact_interaction"
+authors = ["Kumar Amit <krp.amit@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "plrs_etl" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+kafka-python = "^2.0"
+psycopg = { extras = ["binary"], version = "^3.1" }
+pydantic-settings = "^2.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+ruff = "^0.3"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: tests requiring live Postgres + Kafka (skipped by default in unit-only runs)",
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
