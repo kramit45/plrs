@@ -23,6 +23,15 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       timeout: 2s
+  kafka:
+    producer:
+      bootstrap-servers: ${plrs.kafka.bootstrap-servers}
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
 
 server:
   port: ${SERVER_PORT:8080}
@@ -54,3 +63,8 @@ plrs:
     base-url: ${PLRS_ML_URL:http://localhost:8000}
     hmac-secret: ${PLRS_ML_HMAC_SECRET:dev-secret}
     timeout-seconds: 2
+  kafka:
+    enabled: ${PLRS_KAFKA_ENABLED:false}
+    bootstrap-servers: ${PLRS_KAFKA_BOOTSTRAP:localhost:9092}
+    topic-interactions: plrs.interactions
+    topic-mastery: plrs.mastery
