@@ -53,6 +53,26 @@ class RecommendationServiceTest {
     @Mock private TopicRepository topicRepository;
     @Mock private PopularityScorer popularityScorer;
     @Mock private HybridRanker hybridRanker;
+    @Mock private MmrReranker mmrReranker;
+
+    @org.junit.jupiter.api.BeforeEach
+    void mmrPassesThroughByDefault() {
+        // Default: MMR returns the input order trimmed to k. Tests
+        // that care about MMR re-ordering re-stub.
+        lenient()
+                .when(
+                        mmrReranker.rerank(
+                                org.mockito.ArgumentMatchers.anyList(),
+                                org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.anyInt()))
+                .thenAnswer(
+                        inv -> {
+                            List<ContentId> ordered = inv.getArgument(0);
+                            int k = inv.getArgument(2);
+                            return ordered.subList(
+                                    0, Math.min(k, ordered.size()));
+                        });
+    }
 
     @org.junit.jupiter.api.BeforeEach
     void hybridDefaultsToPopularityProxy() {
@@ -89,6 +109,7 @@ class RecommendationServiceTest {
                 topicRepository,
                 popularityScorer,
                 hybridRanker,
+                mmrReranker,
                 CLOCK);
     }
 
@@ -405,6 +426,40 @@ class RecommendationServiceTest {
                 .extracting(r -> r.contentId().value())
                 .as("Hybrid-favoured item ranks first")
                 .startsWith(2L);
+    }
+
+    @Test
+    void mmrReorderingPushesDiverseItemAheadOfHigherRelevance() {
+        // Three feasible candidates with strict relevance order
+        // (1 > 2 > 3). MMR is stubbed to surface a non-relevance order
+        // — the service must emit items in the order MMR returned, not
+        // the relevance order.
+        Content a = content(1L, TOPIC_A, Difficulty.BEGINNER, "a");
+        Content b = content(2L, TOPIC_A, Difficulty.BEGINNER, "b");
+        Content c = content(3L, TOPIC_A, Difficulty.BEGINNER, "c");
+        when(contentRepository.findAllNonQuiz(200)).thenReturn(List.of(a, b, c));
+        when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
+        when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
+        when(hybridRanker.blend(eq(USER), any()))
+                .thenReturn(
+                        Map.of(
+                                ContentId.of(1L), new Blended(0.90, 0.9, 0.0, 0.5, false),
+                                ContentId.of(2L), new Blended(0.50, 0.5, 0.0, 0.5, false),
+                                ContentId.of(3L), new Blended(0.40, 0.4, 0.0, 0.5, false)));
+        when(mmrReranker.rerank(
+                        org.mockito.ArgumentMatchers.anyList(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(
+                        List.of(ContentId.of(1L), ContentId.of(3L), ContentId.of(2L)));
+        stubTopicLookups();
+
+        List<Recommendation> recs = service().generate(USER, 3, "hybrid_v1");
+
+        assertThat(recs)
+                .extracting(r -> r.contentId().value())
+                .as("MMR re-order propagates into emitted ranks")
+                .containsExactly(1L, 3L, 2L);
     }
 
     @Test

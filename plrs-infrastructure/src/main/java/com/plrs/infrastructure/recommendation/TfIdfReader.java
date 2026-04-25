@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.plrs.application.recommendation.ArtifactPayload;
 import com.plrs.application.recommendation.ArtifactRepository;
+import com.plrs.application.recommendation.ContentSimilarity;
 import com.plrs.domain.content.ContentId;
 import java.time.Duration;
 import java.util.HashMap;
@@ -36,7 +37,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(name = {"spring.datasource.url", "spring.data.redis.host"})
-public class TfIdfReader {
+public class TfIdfReader implements ContentSimilarity {
 
     static final String REDIS_KEY = "tfidf:matrix";
 
@@ -69,6 +70,7 @@ public class TfIdfReader {
      * Cosine similarity between two content rows. Returns 0 when
      * either row is unknown.
      */
+    @Override
     public double cosine(ContentId a, ContentId b) {
         if (a.equals(b)) {
             // Self-similarity is always 1 for a non-empty row.

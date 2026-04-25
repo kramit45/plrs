@@ -29,12 +29,11 @@ import org.springframework.stereotype.Service;
 /**
  * Composer that builds the recommender candidate pool, applies the
  * FR-26 prereq filter and the FR-27 feasibility filter, scores via
- * {@link PopularityScorer}, ranks the survivors, truncates to {@code k},
- * and emits {@link Recommendation} aggregates with deterministic
- * reasons. CF / CB hooks land in step 114; for now the popularity
- * score is the only signal.
+ * {@link HybridRanker} (λ-weighted CF + CB with popularity fallback),
+ * diversifies via {@link MmrReranker}, truncates to {@code k}, and
+ * emits {@link Recommendation} aggregates with deterministic reasons.
  *
- * <p>Filtering in order:
+ * <p>Pipeline order:
  *
  * <ol>
  *   <li>Candidate pool: {@link ContentRepository#findAllNonQuiz} capped
@@ -45,14 +44,15 @@ import org.springframework.stereotype.Service;
  *   <li>Feasibility filter (FR-27): drop items whose difficulty rank
  *       exceeds the learner's mastery + 1 band on that content's
  *       topic. Empty-mastery learners only see BEGINNER content.
- *   <li>Popularity score over the survivors.
+ *   <li>Hybrid score (FR-25 / FR-30): {@link HybridRanker#blend}.
+ *   <li>MMR diversification (FR-28): {@link MmrReranker#rerank}.
  *   <li>Backfill if {@code k} unfilled — pad with raw popularity from
  *       the unfiltered pool (FR-30 fallback).
  * </ol>
  *
  * <p>Gated by {@code @ConditionalOnProperty("spring.datasource.url")}.
  *
- * <p>Traces to: FR-25, FR-26, FR-27, FR-29, FR-30.
+ * <p>Traces to: FR-25, FR-26, FR-27, FR-28, FR-29, FR-30.
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
@@ -73,6 +73,7 @@ public class RecommendationService {
     private final TopicRepository topicRepository;
     private final PopularityScorer popularityScorer;
     private final HybridRanker hybridRanker;
+    private final MmrReranker mmrReranker;
     private final Clock clock;
 
     public RecommendationService(
@@ -82,6 +83,7 @@ public class RecommendationService {
             TopicRepository topicRepository,
             PopularityScorer popularityScorer,
             HybridRanker hybridRanker,
+            MmrReranker mmrReranker,
             Clock clock) {
         this.contentRepository = contentRepository;
         this.userSkillRepository = userSkillRepository;
@@ -89,6 +91,7 @@ public class RecommendationService {
         this.topicRepository = topicRepository;
         this.popularityScorer = popularityScorer;
         this.hybridRanker = hybridRanker;
+        this.mmrReranker = mmrReranker;
         this.clock = clock;
     }
 
@@ -149,11 +152,14 @@ public class RecommendationService {
         for (var e : blended.entrySet()) {
             scores.put(e.getKey(), e.getValue().score());
         }
-        List<ContentId> ordered =
+        List<ContentId> byRelevance =
                 scores.entrySet().stream()
                         .sorted(Map.Entry.<ContentId, Double>comparingByValue().reversed())
                         .map(Map.Entry::getKey)
                         .toList();
+
+        // 5b. MMR rerank for diversity (FR-28).
+        List<ContentId> ordered = mmrReranker.rerank(byRelevance, scores, k);
 
         List<Recommendation> out = new ArrayList<>(k);
         Map<ContentId, ScoreBreakdown> breakdowns = new HashMap<>(k);
