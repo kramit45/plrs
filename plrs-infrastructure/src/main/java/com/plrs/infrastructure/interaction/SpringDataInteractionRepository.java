@@ -87,6 +87,57 @@ public class SpringDataInteractionRepository implements InteractionRepository {
     }
 
     @Override
+    public List<InteractionEvent> findRecentPositives(UserId userId, int days, int limit) {
+        if (days < 0) {
+            throw new IllegalArgumentException("days must be >= 0, got " + days);
+        }
+        if (limit < 0) {
+            throw new IllegalArgumentException("limit must be >= 0, got " + limit);
+        }
+        if (limit == 0) {
+            return List.of();
+        }
+        // Production-safe since-anchor: use UTC system clock. Tests
+        // that need a deterministic clock mock the repository.
+        Instant since =
+                Instant.now(java.time.Clock.systemUTC())
+                        .minus(java.time.Duration.ofDays(days));
+        return jpa.findRecentPositives(userId.value(), since, PageRequest.of(0, limit))
+                .stream()
+                .map(SpringDataInteractionRepository::toPositiveDomain)
+                .toList();
+    }
+
+    private static InteractionEvent toPositiveDomain(InteractionJpaEntity e) {
+        switch (e.getEventType()) {
+            case COMPLETE:
+                return InteractionEvent.complete(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Optional.ofNullable(e.getDwellSec()),
+                        Optional.ofNullable(e.getClientInfo()));
+            case LIKE:
+                return InteractionEvent.like(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Optional.ofNullable(e.getClientInfo()));
+            case RATE:
+                return InteractionEvent.rate(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Rating.of(e.getRating()),
+                        Optional.ofNullable(e.getClientInfo()));
+            default:
+                throw new IllegalStateException(
+                        "findRecentPositives returned non-positive event: "
+                                + e.getEventType());
+        }
+    }
+
+    @Override
     public Map<String, Integer> countByIsoWeekSince(UserId userId, Instant since) {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Object[] row : jpa.countByIsoWeekSince(userId.value(), since)) {

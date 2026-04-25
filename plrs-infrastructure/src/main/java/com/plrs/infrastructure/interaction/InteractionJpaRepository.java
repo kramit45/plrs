@@ -75,4 +75,23 @@ public interface InteractionJpaRepository
     List<Object[]> countByContentSince(
             @Param("contentIds") java.util.Collection<Long> contentIds,
             @Param("since") Instant since);
+
+    /**
+     * Most-recent-first stream of the user's positive interactions in
+     * the last N days, capped at {@code limit}. Positive = COMPLETE,
+     * LIKE, or RATE with rating >= 4. Backs CfScorer.
+     */
+    @Query(
+            "SELECT i FROM InteractionJpaEntity i"
+                    + " WHERE i.userId = :userId"
+                    + "   AND i.occurredAt >= :since"
+                    + "   AND ("
+                    + "        i.eventType = com.plrs.domain.interaction.EventType.COMPLETE"
+                    + "     OR i.eventType = com.plrs.domain.interaction.EventType.LIKE"
+                    + "     OR (i.eventType = com.plrs.domain.interaction.EventType.RATE"
+                    + "         AND i.rating >= 4)"
+                    + "   )"
+                    + " ORDER BY i.occurredAt DESC")
+    List<InteractionJpaEntity> findRecentPositives(
+            @Param("userId") UUID userId, @Param("since") Instant since, Pageable pageable);
 }

@@ -62,4 +62,14 @@ public interface InteractionRepository {
      * candidates to zero.
      */
     Map<ContentId, Long> countByContentSince(Collection<ContentId> candidates, Instant since);
+
+    /**
+     * Returns the user's most-recent positive interactions within the
+     * last {@code days} days, capped at {@code limit} rows ordered by
+     * {@code occurredAt} DESC. Positive = {@code COMPLETE}, {@code LIKE},
+     * or {@code RATE} with {@code rating >= 4}. Backs the CfScorer
+     * (step 113) — recent positives seed the sum-of-similarities
+     * computation against the user's history.
+     */
+    List<InteractionEvent> findRecentPositives(UserId userId, int days, int limit);
 }
