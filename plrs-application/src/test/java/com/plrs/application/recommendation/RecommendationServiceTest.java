@@ -52,25 +52,29 @@ class RecommendationServiceTest {
     @Mock private PrerequisiteRepository prerequisiteRepository;
     @Mock private TopicRepository topicRepository;
     @Mock private PopularityScorer popularityScorer;
-    @Mock private CfScorer cfScorer;
+    @Mock private HybridRanker hybridRanker;
 
     @org.junit.jupiter.api.BeforeEach
-    void cfDefaultsToZero() {
-        // CF returns zero per candidate by default — keeps the
-        // popularity-pipeline tests focused. Mockito uses LIFO stub
-        // matching, so a more specific test stub overrides this.
+    void hybridDefaultsToPopularityProxy() {
+        // Default: HybridRanker delegates to popularityScorer (cf=0,
+        // cb=0, blended=popularity). Tests that care about CF/CB can
+        // re-stub.
         lenient()
                 .when(
-                        cfScorer.score(
+                        hybridRanker.blend(
                                 org.mockito.ArgumentMatchers.any(),
                                 org.mockito.ArgumentMatchers.any()))
                 .thenAnswer(
                         inv -> {
-                            java.util.Collection<ContentId> in = inv.getArgument(1);
-                            java.util.Map<ContentId, Double> out = new java.util.HashMap<>();
+                            java.util.Set<ContentId> in = inv.getArgument(1);
+                            java.util.Map<ContentId, Double> pop =
+                                    popularityScorer.score(in);
+                            java.util.Map<ContentId, Blended> out =
+                                    new java.util.HashMap<>();
                             if (in != null) {
                                 for (ContentId c : in) {
-                                    out.put(c, 0.0);
+                                    double p = pop.getOrDefault(c, 0.0);
+                                    out.put(c, new Blended(p, 0.0, 0.0, p, true));
                                 }
                             }
                             return out;
@@ -84,7 +88,7 @@ class RecommendationServiceTest {
                 prerequisiteRepository,
                 topicRepository,
                 popularityScorer,
-                cfScorer,
+                hybridRanker,
                 CLOCK);
     }
 
@@ -250,10 +254,9 @@ class RecommendationServiceTest {
                 .extracting(r -> r.contentId().value())
                 .containsExactly(3L, 2L, 1L);
         assertThat(recs.get(0).rankPosition()).isEqualTo(1);
-        // The 50/50 blend halves popularity-only score (CF is zero by
-        // default in this test). Step 119 introduces the proper
-        // λ-weighted hybrid which removes the halving.
-        assertThat(recs.get(0).score().value()).isEqualTo(0.475);
+        // HybridRanker's cold-start branch surfaces popularity as-is
+        // (0.95) when CF and CB are absent — no more halving.
+        assertThat(recs.get(0).score().value()).isEqualTo(0.95);
     }
 
     @Test
@@ -378,35 +381,29 @@ class RecommendationServiceTest {
     }
 
     @Test
-    void cfInfluencesOrderingWhenPopularityIsEqual() {
-        // Three feasible candidates with identical popularity. CF
-        // pushes item 2 to the top: pop 0.5 vs cf 0.9 blends to 0.7,
-        // beating items 1 and 3 at (0.5 + 0.0) / 2 = 0.25.
+    void hybridBlendInfluencesOrderingWhenPopularityIsEqual() {
+        // Three feasible candidates with identical popularity. The
+        // HybridRanker stub gives item 2 a much higher blended score
+        // — 0.7 vs 0.25 — so it must rank first.
         Content a = content(1L, TOPIC_A, Difficulty.BEGINNER, "a");
         Content b = content(2L, TOPIC_A, Difficulty.BEGINNER, "b");
         Content c = content(3L, TOPIC_A, Difficulty.BEGINNER, "c");
         when(contentRepository.findAllNonQuiz(200)).thenReturn(List.of(a, b, c));
         when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
         when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
-        when(popularityScorer.score(any()))
+        when(hybridRanker.blend(eq(USER), any()))
                 .thenReturn(
                         Map.of(
-                                ContentId.of(1L), 0.5,
-                                ContentId.of(2L), 0.5,
-                                ContentId.of(3L), 0.5));
-        when(cfScorer.score(eq(USER), any()))
-                .thenReturn(
-                        Map.of(
-                                ContentId.of(1L), 0.0,
-                                ContentId.of(2L), 0.9,
-                                ContentId.of(3L), 0.0));
+                                ContentId.of(1L), new Blended(0.25, 0.0, 0.0, 0.5, false),
+                                ContentId.of(2L), new Blended(0.70, 0.9, 0.5, 0.5, false),
+                                ContentId.of(3L), new Blended(0.25, 0.0, 0.0, 0.5, false)));
         stubTopicLookups();
 
-        List<Recommendation> recs = service().generate(USER, 3, "cf_v1");
+        List<Recommendation> recs = service().generate(USER, 3, "hybrid_v1");
 
         assertThat(recs)
                 .extracting(r -> r.contentId().value())
-                .as("CF-favoured item ranks first; ties between the other two are stable")
+                .as("Hybrid-favoured item ranks first")
                 .startsWith(2L);
     }
 

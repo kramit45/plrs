@@ -185,16 +185,16 @@ class GenerateRecommendationsUseCaseTest {
     }
 
     @Test
-    void warmUserGetsCfV1Variant() {
+    void warmUserGetsHybridV1Variant() {
         when(userRepository.getSkillsVersion(USER)).thenReturn(1L);
         when(cacheStore.get(USER)).thenReturn(Optional.empty());
         when(interactionRepository.countPositivesForUser(USER)).thenReturn(7L);
-        when(recommendationService.generate(USER, 1, "cf_v1"))
-                .thenReturn(List.of(rec(1L, 1, 0.5, "cf_v1")));
+        when(recommendationService.generate(USER, 1, "hybrid_v1"))
+                .thenReturn(List.of(rec(1L, 1, 0.5, "hybrid_v1")));
 
         useCase().handle(USER, 1);
 
-        verify(recommendationService).generate(USER, 1, "cf_v1");
+        verify(recommendationService).generate(USER, 1, "hybrid_v1");
     }
 
     @Test

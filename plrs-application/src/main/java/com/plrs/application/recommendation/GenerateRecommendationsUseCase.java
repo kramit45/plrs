@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GenerateRecommendationsUseCase {
 
     /** Variant tag used when the user has at least one positive event. */
-    public static final String VARIANT_CF = "cf_v1";
+    public static final String VARIANT_CF = "hybrid_v1";
 
     /** Cold-start variant tag — popularity-only blend ineffective for new users. */
     public static final String VARIANT_POPULARITY = Recommendation.DEFAULT_MODEL_VARIANT;

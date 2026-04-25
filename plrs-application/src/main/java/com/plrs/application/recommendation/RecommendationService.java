@@ -72,7 +72,7 @@ public class RecommendationService {
     private final PrerequisiteRepository prerequisiteRepository;
     private final TopicRepository topicRepository;
     private final PopularityScorer popularityScorer;
-    private final CfScorer cfScorer;
+    private final HybridRanker hybridRanker;
     private final Clock clock;
 
     public RecommendationService(
@@ -81,14 +81,14 @@ public class RecommendationService {
             PrerequisiteRepository prerequisiteRepository,
             TopicRepository topicRepository,
             PopularityScorer popularityScorer,
-            CfScorer cfScorer,
+            HybridRanker hybridRanker,
             Clock clock) {
         this.contentRepository = contentRepository;
         this.userSkillRepository = userSkillRepository;
         this.prerequisiteRepository = prerequisiteRepository;
         this.topicRepository = topicRepository;
         this.popularityScorer = popularityScorer;
-        this.cfScorer = cfScorer;
+        this.hybridRanker = hybridRanker;
         this.clock = clock;
     }
 
@@ -142,16 +142,12 @@ public class RecommendationService {
             }
         }
 
-        // 5. Hybrid score = 0.5 * popularity + 0.5 * CF (interim
-        //    blend; step 119 introduces the proper λ-weighted hybrid
-        //    with cold-start detection).
-        Map<ContentId, Double> popScores = popularityScorer.score(feasible);
-        Map<ContentId, Double> cfScores = cfScorer.score(userId, feasible);
+        // 5. Hybrid score via HybridRanker — λ-weighted CF + CB with
+        //    a cold-start fallback to popularity (FR-25 / FR-30).
+        Map<ContentId, Blended> blended = hybridRanker.blend(userId, feasible);
         Map<ContentId, Double> scores = new HashMap<>(feasible.size());
-        for (ContentId cid : feasible) {
-            double pop = popScores.getOrDefault(cid, 0.0);
-            double cf = cfScores.getOrDefault(cid, 0.0);
-            scores.put(cid, 0.5 * pop + 0.5 * cf);
+        for (var e : blended.entrySet()) {
+            scores.put(e.getKey(), e.getValue().score());
         }
         List<ContentId> ordered =
                 scores.entrySet().stream()
@@ -171,11 +167,9 @@ public class RecommendationService {
             if (c == null) {
                 continue;
             }
-            double pop = popScores.getOrDefault(cid, 0.0);
-            double cf = cfScores.getOrDefault(cid, 0.0);
-            double blended = scores.get(cid);
-            out.add(buildRecommendation(userId, c, blended, rank++, modelVariant, now));
-            breakdowns.put(cid, new ScoreBreakdown(pop, cf, 0.0, blended));
+            Blended b = blended.get(cid);
+            out.add(buildRecommendation(userId, c, b.score(), rank++, modelVariant, now));
+            breakdowns.put(cid, new ScoreBreakdown(b.popularity(), b.cf(), b.cb(), b.score()));
         }
 
         // 6. Backfill (FR-30): if we under-filled, pad with the
