@@ -6,6 +6,19 @@
     <h1 class="h3 mb-4">Your dashboard</h1>
 
     <div class="row g-3">
+        <div class="col-12">
+            <div class="card shadow-sm" id="recommendations-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Recommended for you</h2>
+                    <p class="text-muted small mb-2"
+                       id="recommendations-loading">
+                        Loading recommendations…
+                    </p>
+                    <ul id="recommendations" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+        </div>
+
         <div class="col-md-6">
             <div class="card shadow-sm h-100" id="mastery-card">
                 <div class="card-body">
@@ -97,6 +110,7 @@
     </div>
 
     <script th:src="@{/js/dashboard-charts.js}"></script>
+    <script th:src="@{/js/recommendations.js}"></script>
 </div>
 </body>
 </html>

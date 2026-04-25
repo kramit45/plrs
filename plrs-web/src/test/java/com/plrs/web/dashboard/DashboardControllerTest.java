@@ -128,6 +128,17 @@ class DashboardControllerTest {
 
     @Test
     @WithMockUser(username = STUDENT_UUID, roles = "STUDENT")
+    void getDashboardIncludesRecommendationsSection() throws Exception {
+        when(service.load(org.mockito.ArgumentMatchers.any())).thenReturn(populatedView());
+
+        mockMvc.perform(get("/dashboard"))
+                .andExpect(content().string(containsString("id=\"recommendations-card\"")))
+                .andExpect(content().string(containsString("id=\"recommendations\"")))
+                .andExpect(content().string(containsString("/js/recommendations.js")));
+    }
+
+    @Test
+    @WithMockUser(username = STUDENT_UUID, roles = "STUDENT")
     void responseHtmlRendersRecentAttemptsTable() throws Exception {
         when(service.load(org.mockito.ArgumentMatchers.any())).thenReturn(populatedView());
 
