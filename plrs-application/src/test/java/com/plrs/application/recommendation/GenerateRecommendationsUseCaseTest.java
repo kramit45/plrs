@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.plrs.domain.content.ContentId;
+import com.plrs.domain.interaction.InteractionRepository;
 import com.plrs.domain.recommendation.Recommendation;
 import com.plrs.domain.recommendation.RecommendationReason;
 import com.plrs.domain.recommendation.RecommendationRepository;
@@ -39,6 +40,7 @@ class GenerateRecommendationsUseCaseTest {
     @Mock private RecommendationService recommendationService;
     @Mock private RecommendationRepository recommendationRepository;
     @Mock private UserRepository userRepository;
+    @Mock private InteractionRepository interactionRepository;
     @Mock private TopNCacheStore cacheStore;
 
     private GenerateRecommendationsUseCase useCase() {
@@ -46,6 +48,7 @@ class GenerateRecommendationsUseCaseTest {
                 recommendationService,
                 recommendationRepository,
                 userRepository,
+                interactionRepository,
                 cacheStore,
                 CLOCK);
     }
@@ -179,5 +182,31 @@ class GenerateRecommendationsUseCaseTest {
         verify(cacheStore).put(eq(USER), cap.capture());
         assertThat(cap.getValue().version()).isEqualTo(version);
         assertThat(cap.getValue().computedAt()).isEqualTo(T0);
+    }
+
+    @Test
+    void warmUserGetsCfV1Variant() {
+        when(userRepository.getSkillsVersion(USER)).thenReturn(1L);
+        when(cacheStore.get(USER)).thenReturn(Optional.empty());
+        when(interactionRepository.countPositivesForUser(USER)).thenReturn(7L);
+        when(recommendationService.generate(USER, 1, "cf_v1"))
+                .thenReturn(List.of(rec(1L, 1, 0.5, "cf_v1")));
+
+        useCase().handle(USER, 1);
+
+        verify(recommendationService).generate(USER, 1, "cf_v1");
+    }
+
+    @Test
+    void coldStartUserGetsPopularityV1Variant() {
+        when(userRepository.getSkillsVersion(USER)).thenReturn(1L);
+        when(cacheStore.get(USER)).thenReturn(Optional.empty());
+        when(interactionRepository.countPositivesForUser(USER)).thenReturn(0L);
+        when(recommendationService.generate(USER, 1, "popularity_v1"))
+                .thenReturn(List.of(rec(1L, 1, 0.5, "popularity_v1")));
+
+        useCase().handle(USER, 1);
+
+        verify(recommendationService).generate(USER, 1, "popularity_v1");
     }
 }

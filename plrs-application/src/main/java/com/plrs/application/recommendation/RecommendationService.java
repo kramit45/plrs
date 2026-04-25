@@ -72,6 +72,7 @@ public class RecommendationService {
     private final PrerequisiteRepository prerequisiteRepository;
     private final TopicRepository topicRepository;
     private final PopularityScorer popularityScorer;
+    private final CfScorer cfScorer;
     private final Clock clock;
 
     public RecommendationService(
@@ -80,12 +81,14 @@ public class RecommendationService {
             PrerequisiteRepository prerequisiteRepository,
             TopicRepository topicRepository,
             PopularityScorer popularityScorer,
+            CfScorer cfScorer,
             Clock clock) {
         this.contentRepository = contentRepository;
         this.userSkillRepository = userSkillRepository;
         this.prerequisiteRepository = prerequisiteRepository;
         this.topicRepository = topicRepository;
         this.popularityScorer = popularityScorer;
+        this.cfScorer = cfScorer;
         this.clock = clock;
     }
 
@@ -126,13 +129,19 @@ public class RecommendationService {
             }
         }
 
-        // 5. Score + rank + truncate. Filter the score map down to
-        //    ids the scorer was actually asked about; defensive
-        //    against scorers that over-return.
-        Map<ContentId, Double> scores = popularityScorer.score(feasible);
+        // 5. Hybrid score = 0.5 * popularity + 0.5 * CF (interim
+        //    blend; step 119 introduces the proper λ-weighted hybrid
+        //    with cold-start detection).
+        Map<ContentId, Double> popScores = popularityScorer.score(feasible);
+        Map<ContentId, Double> cfScores = cfScorer.score(userId, feasible);
+        Map<ContentId, Double> scores = new HashMap<>(feasible.size());
+        for (ContentId cid : feasible) {
+            double pop = popScores.getOrDefault(cid, 0.0);
+            double cf = cfScores.getOrDefault(cid, 0.0);
+            scores.put(cid, 0.5 * pop + 0.5 * cf);
+        }
         List<ContentId> ordered =
                 scores.entrySet().stream()
-                        .filter(e -> feasible.contains(e.getKey()))
                         .sorted(Map.Entry.<ContentId, Double>comparingByValue().reversed())
                         .map(Map.Entry::getKey)
                         .toList();
@@ -231,7 +240,7 @@ public class RecommendationService {
                 topicRepository.findById(c.topicId()).map(Topic::name).orElse("(unknown)");
         String reason =
                 truncateReason(
-                        "Popular among learners exploring " + topicName);
+                        "Popular and similar to what you've liked in " + topicName);
         return Recommendation.create(
                 userId,
                 c.id(),

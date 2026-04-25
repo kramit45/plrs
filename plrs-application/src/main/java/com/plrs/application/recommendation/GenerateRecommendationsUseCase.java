@@ -1,5 +1,6 @@
 package com.plrs.application.recommendation;
 
+import com.plrs.domain.interaction.InteractionRepository;
 import com.plrs.domain.recommendation.Recommendation;
 import com.plrs.domain.recommendation.RecommendationRepository;
 import com.plrs.domain.user.UserId;
@@ -25,8 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
  * recompute, since trimming from a larger cached list to a smaller k
  * is fine but going the other way isn't.
  *
- * <p>Default model variant is {@link Recommendation#DEFAULT_MODEL_VARIANT}
- * ({@code "popularity_v1"}) — the only variant Iter 3 ships in step 108.
+ * <p>Model variant is {@code cf_v1} when the user has any positive
+ * interactions ({@link InteractionRepository#countPositivesForUser}
+ * {@code > 0}) and {@code popularity_v1} otherwise — the cold-start
+ * branch the offline harness will track.
  *
  * <p>Gated by {@code @ConditionalOnProperty("spring.datasource.url")}.
  *
@@ -38,9 +41,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class GenerateRecommendationsUseCase {
 
+    /** Variant tag used when the user has at least one positive event. */
+    public static final String VARIANT_CF = "cf_v1";
+
+    /** Cold-start variant tag — popularity-only blend ineffective for new users. */
+    public static final String VARIANT_POPULARITY = Recommendation.DEFAULT_MODEL_VARIANT;
+
     private final RecommendationService recommendationService;
     private final RecommendationRepository recommendationRepository;
     private final UserRepository userRepository;
+    private final InteractionRepository interactionRepository;
     private final TopNCacheStore cacheStore;
     private final Clock clock;
 
@@ -48,11 +58,13 @@ public class GenerateRecommendationsUseCase {
             RecommendationService recommendationService,
             RecommendationRepository recommendationRepository,
             UserRepository userRepository,
+            InteractionRepository interactionRepository,
             TopNCacheStore cacheStore,
             Clock clock) {
         this.recommendationService = recommendationService;
         this.recommendationRepository = recommendationRepository;
         this.userRepository = userRepository;
+        this.interactionRepository = interactionRepository;
         this.cacheStore = cacheStore;
         this.clock = clock;
     }
@@ -70,9 +82,12 @@ public class GenerateRecommendationsUseCase {
             return cached.get().items().subList(0, k);
         }
 
+        String variant =
+                interactionRepository.countPositivesForUser(userId) > 0L
+                        ? VARIANT_CF
+                        : VARIANT_POPULARITY;
         List<Recommendation> recs =
-                recommendationService.generate(
-                        userId, k, Recommendation.DEFAULT_MODEL_VARIANT);
+                recommendationService.generate(userId, k, variant);
         recommendationRepository.saveAll(recs);
         cacheStore.put(userId, new CachedTopN(currentVersion, recs, Instant.now(clock)));
         return recs;

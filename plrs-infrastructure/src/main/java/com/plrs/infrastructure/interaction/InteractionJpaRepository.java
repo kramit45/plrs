@@ -94,4 +94,19 @@ public interface InteractionJpaRepository
                     + " ORDER BY i.occurredAt DESC")
     List<InteractionJpaEntity> findRecentPositives(
             @Param("userId") UUID userId, @Param("since") Instant since, Pageable pageable);
+
+    /**
+     * Counts the user's all-time positive events (COMPLETE, LIKE, or
+     * RATE>=4). Used to toggle popularity_v1 vs cf_v1 model variant.
+     */
+    @Query(
+            "SELECT COUNT(i) FROM InteractionJpaEntity i"
+                    + " WHERE i.userId = :userId"
+                    + "   AND ("
+                    + "        i.eventType = com.plrs.domain.interaction.EventType.COMPLETE"
+                    + "     OR i.eventType = com.plrs.domain.interaction.EventType.LIKE"
+                    + "     OR (i.eventType = com.plrs.domain.interaction.EventType.RATE"
+                    + "         AND i.rating >= 4)"
+                    + "   )")
+    long countPositivesForUser(@Param("userId") UUID userId);
 }

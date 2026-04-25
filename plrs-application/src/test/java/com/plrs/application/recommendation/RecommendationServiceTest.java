@@ -52,6 +52,30 @@ class RecommendationServiceTest {
     @Mock private PrerequisiteRepository prerequisiteRepository;
     @Mock private TopicRepository topicRepository;
     @Mock private PopularityScorer popularityScorer;
+    @Mock private CfScorer cfScorer;
+
+    @org.junit.jupiter.api.BeforeEach
+    void cfDefaultsToZero() {
+        // CF returns zero per candidate by default — keeps the
+        // popularity-pipeline tests focused. Mockito uses LIFO stub
+        // matching, so a more specific test stub overrides this.
+        lenient()
+                .when(
+                        cfScorer.score(
+                                org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(
+                        inv -> {
+                            java.util.Collection<ContentId> in = inv.getArgument(1);
+                            java.util.Map<ContentId, Double> out = new java.util.HashMap<>();
+                            if (in != null) {
+                                for (ContentId c : in) {
+                                    out.put(c, 0.0);
+                                }
+                            }
+                            return out;
+                        });
+    }
 
     private RecommendationService service() {
         return new RecommendationService(
@@ -60,6 +84,7 @@ class RecommendationServiceTest {
                 prerequisiteRepository,
                 topicRepository,
                 popularityScorer,
+                cfScorer,
                 CLOCK);
     }
 
@@ -225,7 +250,10 @@ class RecommendationServiceTest {
                 .extracting(r -> r.contentId().value())
                 .containsExactly(3L, 2L, 1L);
         assertThat(recs.get(0).rankPosition()).isEqualTo(1);
-        assertThat(recs.get(0).score().value()).isEqualTo(0.95);
+        // The 50/50 blend halves popularity-only score (CF is zero by
+        // default in this test). Step 119 introduces the proper
+        // λ-weighted hybrid which removes the halving.
+        assertThat(recs.get(0).score().value()).isEqualTo(0.475);
     }
 
     @Test
@@ -347,5 +375,53 @@ class RecommendationServiceTest {
         List<Recommendation> recs = service().generate(USER, 1, "experiment_a");
 
         assertThat(recs.get(0).modelVariant()).isEqualTo("experiment_a");
+    }
+
+    @Test
+    void cfInfluencesOrderingWhenPopularityIsEqual() {
+        // Three feasible candidates with identical popularity. CF
+        // pushes item 2 to the top: pop 0.5 vs cf 0.9 blends to 0.7,
+        // beating items 1 and 3 at (0.5 + 0.0) / 2 = 0.25.
+        Content a = content(1L, TOPIC_A, Difficulty.BEGINNER, "a");
+        Content b = content(2L, TOPIC_A, Difficulty.BEGINNER, "b");
+        Content c = content(3L, TOPIC_A, Difficulty.BEGINNER, "c");
+        when(contentRepository.findAllNonQuiz(200)).thenReturn(List.of(a, b, c));
+        when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
+        when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
+        when(popularityScorer.score(any()))
+                .thenReturn(
+                        Map.of(
+                                ContentId.of(1L), 0.5,
+                                ContentId.of(2L), 0.5,
+                                ContentId.of(3L), 0.5));
+        when(cfScorer.score(eq(USER), any()))
+                .thenReturn(
+                        Map.of(
+                                ContentId.of(1L), 0.0,
+                                ContentId.of(2L), 0.9,
+                                ContentId.of(3L), 0.0));
+        stubTopicLookups();
+
+        List<Recommendation> recs = service().generate(USER, 3, "cf_v1");
+
+        assertThat(recs)
+                .extracting(r -> r.contentId().value())
+                .as("CF-favoured item ranks first; ties between the other two are stable")
+                .startsWith(2L);
+    }
+
+    @Test
+    void reasonTextReflectsCfBlend() {
+        Content a = content(1L, TOPIC_A, Difficulty.BEGINNER, "a");
+        when(contentRepository.findAllNonQuiz(200)).thenReturn(List.of(a));
+        when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
+        when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
+        when(popularityScorer.score(any())).thenReturn(Map.of(ContentId.of(1L), 0.5));
+        stubTopicLookups();
+
+        List<Recommendation> recs = service().generate(USER, 1, "cf_v1");
+
+        assertThat(recs.get(0).reason().text())
+                .contains("Popular and similar to what you've liked");
     }
 }

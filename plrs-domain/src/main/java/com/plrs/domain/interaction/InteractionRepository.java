@@ -72,4 +72,13 @@ public interface InteractionRepository {
      * computation against the user's history.
      */
     List<InteractionEvent> findRecentPositives(UserId userId, int days, int limit);
+
+    /**
+     * Counts the user's positive interactions over all time. Used by
+     * {@code GenerateRecommendationsUseCase} to toggle the model variant
+     * tag between {@code popularity_v1} (cold-start) and {@code cf_v1}
+     * (warm). Positive = {@code COMPLETE}, {@code LIKE}, or
+     * {@code RATE} with {@code rating >= 4}.
+     */
+    long countPositivesForUser(UserId userId);
 }

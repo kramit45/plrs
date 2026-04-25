@@ -138,6 +138,11 @@ public class SpringDataInteractionRepository implements InteractionRepository {
     }
 
     @Override
+    public long countPositivesForUser(UserId userId) {
+        return jpa.countPositivesForUser(userId.value());
+    }
+
+    @Override
     public Map<String, Integer> countByIsoWeekSince(UserId userId, Instant since) {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Object[] row : jpa.countByIsoWeekSince(userId.value(), since)) {
