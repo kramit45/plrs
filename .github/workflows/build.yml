@@ -199,6 +199,16 @@ jobs:
           newman run test/newman/plrs-iter2.postman_collection.json \
             -e test/newman/plrs-iter2.postman_environment.json
 
+      - name: Load Iter 3 seed
+        run: |
+          PGPASSWORD=plrs psql -h localhost -U plrs -d plrs \
+            -f test/newman/seed-iter3.sql
+
+      - name: Run Newman Iter 3 collection
+        run: |
+          newman run test/newman/plrs-iter3.postman_collection.json \
+            -e test/newman/plrs-iter3.postman_environment.json
+
       - name: Upload application log on failure
         if: failure()
         uses: actions/upload-artifact@v4
