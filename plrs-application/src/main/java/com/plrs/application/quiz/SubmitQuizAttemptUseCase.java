@@ -62,6 +62,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
+@Transactional
 public final class SubmitQuizAttemptUseCase {
 
     /**
@@ -101,7 +102,6 @@ public final class SubmitQuizAttemptUseCase {
         this.clock = clock;
     }
 
-    @Transactional
     @com.plrs.application.audit.Auditable(
             action = "QUIZ_ATTEMPTED",
             entityType = "quiz_attempt")
