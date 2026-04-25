@@ -57,4 +57,18 @@ public interface ContentJpaRepository extends JpaRepository<ContentJpaEntity, Lo
                             + "       @@ plainto_tsquery('english', :q)",
             nativeQuery = true)
     long countByTsQuery(@Param("q") String q);
+
+    /**
+     * Recommender candidate pool: non-QUIZ content, most-recent-first,
+     * capped at {@code limit}. Native query so we can keep the LIMIT
+     * inside the SQL the database planner sees.
+     */
+    @Query(
+            value =
+                    "SELECT * FROM plrs_ops.content"
+                            + " WHERE ctype <> 'QUIZ'"
+                            + " ORDER BY created_at DESC"
+                            + " LIMIT :limit",
+            nativeQuery = true)
+    List<ContentJpaEntity> findAllNonQuiz(@Param("limit") int limit);
 }

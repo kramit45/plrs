@@ -163,6 +163,20 @@ public class SpringDataContentRepository implements ContentRepository {
     }
 
     @Override
+    public List<Content> findAllNonQuiz(int limit) {
+        if (limit < 0) {
+            throw new IllegalArgumentException("limit must be >= 0, got " + limit);
+        }
+        if (limit == 0) {
+            return List.of();
+        }
+        // Non-QUIZ rows by definition carry no quiz items, so the
+        // single-arg toDomain is safe here — no need to hit the
+        // quiz-items native join.
+        return jpa.findAllNonQuiz(limit).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public boolean existsByTopicIdAndTitle(TopicId topicId, String title) {
         return jpa.existsByTopicIdAndTitle(topicId.value(), title);
     }

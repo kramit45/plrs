@@ -91,4 +91,17 @@ public interface ContentRepository {
      * <p>Traces to: §3.b.5.1 (TRG-1 ctype-quiz coupling), FR-19.
      */
     Content saveQuiz(QuizContentDraft draft);
+
+    /**
+     * Returns a candidate pool of non-QUIZ content (i.e.
+     * VIDEO / ARTICLE / EXERCISE) for the recommender. Capped at
+     * {@code limit} rows; ordering is most-recently-created-first so
+     * the candidate set stays fresh as the catalogue grows.
+     *
+     * <p>QUIZ-ctype content is excluded: quizzes are scoring vehicles,
+     * not recommendable items.
+     *
+     * <p>Traces to: FR-25 (candidate pool), FR-30 (popularity input).
+     */
+    List<Content> findAllNonQuiz(int limit);
 }
