@@ -2,6 +2,7 @@ package com.plrs.web;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Entry point for the Personalized Learning Recommendation System (PLRS).
@@ -17,6 +18,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * <p>Traces to: §3.a — web module owns the Boot entrypoint.
  */
 @SpringBootApplication(scanBasePackages = "com.plrs")
+@EnableScheduling
 public class PlrsApplication {
 
     public static void main(String[] args) {

@@ -35,7 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
             "spring.flyway.locations=classpath:db/migration",
             "spring.flyway.baseline-on-migrate=false",
             "spring.jpa.hibernate.ddl-auto=validate",
-            "spring.jpa.properties.hibernate.default_schema=plrs_ops"
+            "spring.jpa.properties.hibernate.default_schema=plrs_ops",
+            // Disable the drain job in this IT — it would pull in a Clock
+            // bean we don't supply in the nested ITApp.
+            "plrs.outbox.drain.enabled=false"
         })
 @Transactional
 class SpringDataOutboxRepositoryIT extends PostgresTestBase {

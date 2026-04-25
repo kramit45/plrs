@@ -44,3 +44,9 @@ plrs:
     public-key-pem: ${PLRS_JWT_PUBLIC_KEY_PEM:}
   cors:
     allowed-origins: http://localhost:8080
+  outbox:
+    drain:
+      enabled: true
+      fixed-delay-ms: 5000
+      initial-delay-ms: 5000
+      batch-size: 25
