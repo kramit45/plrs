@@ -49,6 +49,7 @@ public final class CreateContentUseCase {
     }
 
     @Transactional
+    @com.plrs.application.audit.Auditable(action = "CONTENT_CREATED", entityType = "content")
     public ContentId handle(CreateContentCommand cmd) {
         if (topicRepository.findById(cmd.topicId()).isEmpty()) {
             throw new TopicNotFoundException(cmd.topicId());

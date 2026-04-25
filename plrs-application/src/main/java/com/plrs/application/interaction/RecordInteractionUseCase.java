@@ -50,6 +50,9 @@ public final class RecordInteractionUseCase {
     }
 
     @Transactional
+    @com.plrs.application.audit.Auditable(
+            action = "INTERACTION_RECORDED",
+            entityType = "interaction")
     public RecordInteractionResult handle(RecordInteractionCommand cmd) {
         EventType type = EventType.fromName(cmd.eventType());
         // Cross-field validation upfront so mismatched (eventType, field)

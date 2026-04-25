@@ -102,6 +102,9 @@ public final class SubmitQuizAttemptUseCase {
     }
 
     @Transactional
+    @com.plrs.application.audit.Auditable(
+            action = "QUIZ_ATTEMPTED",
+            entityType = "quiz_attempt")
     public SubmitQuizAttemptResult handle(SubmitQuizAttemptCommand cmd) {
         // §3.b.7.2: per-(user, quiz) advisory lock prevents double-submit
         // races and serialises the EWMA mastery update for this learner

@@ -82,6 +82,7 @@ public class LoginUseCase {
         this.dummyHash = BCryptHash.of(DUMMY_HASH_VALUE);
     }
 
+    @com.plrs.application.audit.Auditable(action = "LOGIN_OK", entityType = "user")
     public LoginResult handle(LoginCommand cmd) {
         String rawPassword = cmd.rawPassword() == null ? "" : cmd.rawPassword();
 

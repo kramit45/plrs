@@ -85,6 +85,7 @@ public final class AddPrerequisiteUseCase {
      * <p>Traces to: §2.e.2.5 (CFD-4), §3.b.7.1 (SERIALIZABLE + retry),
      * FR-09.
      */
+    @com.plrs.application.audit.Auditable(action = "PREREQ_ADDED", entityType = "prerequisite")
     public void handle(AddPrerequisiteCommand cmd) {
         try {
             doHandle(cmd);

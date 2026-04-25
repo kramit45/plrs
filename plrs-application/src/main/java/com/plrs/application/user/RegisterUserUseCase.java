@@ -55,6 +55,7 @@ public class RegisterUserUseCase {
         this.clock = clock;
     }
 
+    @com.plrs.application.audit.Auditable(action = "USER_REGISTERED", entityType = "user")
     public UserId handle(RegisterUserCommand cmd) {
         Email email = Email.of(cmd.email());
         if (users.existsByEmail(email)) {
