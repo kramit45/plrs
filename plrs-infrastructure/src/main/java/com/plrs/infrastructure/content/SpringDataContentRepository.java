@@ -101,4 +101,13 @@ public class SpringDataContentRepository implements ContentRepository {
         int totalPages = (int) Math.ceil((double) total / pageSize);
         return new SearchPage(items, pageNumber, pageSize, total, totalPages);
     }
+
+    @Override
+    public Content saveQuiz(com.plrs.domain.content.QuizContentDraft draft) {
+        // Stub: real implementation lands in step 81 alongside the
+        // AuthorQuizUseCase. Throws so accidental Iter-2 calls fail loudly
+        // rather than silently no-oping.
+        throw new UnsupportedOperationException(
+                "saveQuiz not yet implemented; lands in step 81");
+    }
 }

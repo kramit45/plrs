@@ -6,12 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.plrs.domain.common.AuditFields;
 import com.plrs.domain.common.DomainInvariantException;
 import com.plrs.domain.common.DomainValidationException;
+import com.plrs.domain.quiz.QuizItem;
+import com.plrs.domain.quiz.QuizItemOption;
 import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -73,12 +76,93 @@ class ContentTest {
         assertThat(content.ctype()).isEqualTo(ContentType.EXERCISE);
     }
 
+    private static QuizItem oneItem(int order) {
+        return QuizItem.of(
+                order,
+                TOPIC,
+                "stem-" + order,
+                Optional.empty(),
+                List.of(
+                        new QuizItemOption(1, "a", true),
+                        new QuizItemOption(2, "b", false)));
+    }
+
     @Test
-    void rehydrateAcceptsQuizFromPersistedState() {
-        Content quiz = rehydrate(ContentType.QUIZ);
+    void quizRehydrateWithItemsSucceeds() {
+        Content quiz =
+                Content.rehydrate(
+                        ContentId.of(42L),
+                        TOPIC,
+                        "Intro to QUIZ",
+                        ContentType.QUIZ,
+                        Difficulty.BEGINNER,
+                        15,
+                        "https://example.com/quiz",
+                        Optional.of("desc"),
+                        Set.of(),
+                        Optional.empty(),
+                        audit(),
+                        List.of(oneItem(1), oneItem(2)));
 
         assertThat(quiz.ctype()).isEqualTo(ContentType.QUIZ);
-        assertThat(quiz.title()).isEqualTo("Intro to QUIZ");
+        assertThat(quiz.quizItems()).hasSize(2);
+    }
+
+    @Test
+    void quizRehydrateWithoutItemsThrows() {
+        // The 11-arg rehydrate defaults items to empty — incompatible with QUIZ.
+        assertThatThrownBy(() -> rehydrate(ContentType.QUIZ))
+                .isInstanceOf(DomainInvariantException.class)
+                .hasMessageContaining("QUIZ must carry at least one QuizItem");
+    }
+
+    @Test
+    void nonQuizRehydrateWithItemsThrows() {
+        assertThatThrownBy(
+                        () ->
+                                Content.rehydrate(
+                                        ContentId.of(42L),
+                                        TOPIC,
+                                        "title",
+                                        ContentType.VIDEO,
+                                        Difficulty.BEGINNER,
+                                        10,
+                                        "https://x.y",
+                                        Optional.empty(),
+                                        Set.of(),
+                                        Optional.empty(),
+                                        audit(),
+                                        List.of(oneItem(1))))
+                .isInstanceOf(DomainInvariantException.class)
+                .hasMessageContaining("must not carry quiz items");
+    }
+
+    @Test
+    void quizItemsAccessorReturnsUnmodifiableList() {
+        Content quiz =
+                Content.rehydrate(
+                        ContentId.of(42L),
+                        TOPIC,
+                        "Quiz",
+                        ContentType.QUIZ,
+                        Difficulty.BEGINNER,
+                        10,
+                        "https://x.y",
+                        Optional.empty(),
+                        Set.of(),
+                        Optional.empty(),
+                        audit(),
+                        List.of(oneItem(1)));
+
+        assertThatThrownBy(() -> quiz.quizItems().add(oneItem(99)))
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void nonQuizContentReturnsEmptyQuizItemsList() {
+        Content video = rehydrate(ContentType.VIDEO);
+
+        assertThat(video.quizItems()).isEmpty();
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.plrs.domain.content;
 import com.plrs.domain.common.AuditFields;
 import com.plrs.domain.common.DomainInvariantException;
 import com.plrs.domain.common.DomainValidationException;
+import com.plrs.domain.quiz.QuizItem;
 import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
 import java.util.LinkedHashSet;
@@ -88,6 +89,7 @@ public final class Content {
     private final Set<String> tags;
     private final Optional<UserId> createdBy;
     private final AuditFields audit;
+    private final List<QuizItem> quizItems;
 
     private Content(
             ContentId id,
@@ -100,7 +102,8 @@ public final class Content {
             String description,
             Set<String> tags,
             Optional<UserId> createdBy,
-            AuditFields audit) {
+            AuditFields audit,
+            List<QuizItem> quizItems) {
         if (id == null) {
             throw new DomainValidationException("Content id must not be null");
         }
@@ -147,6 +150,23 @@ public final class Content {
             throw new DomainInvariantException(
                     "Content url must start with http:// or https://, got '" + url + "'");
         }
+        // QUIZ ↔ items coupling per §3.b.5.1 (TRG-1 mirror in domain).
+        // QUIZ ctype requires at least one item; non-QUIZ must carry no items.
+        // Null items lists are coerced to empty for non-QUIZ for caller
+        // ergonomics; QUIZ ctype always requires the caller to pass items.
+        List<QuizItem> coercedItems = quizItems == null ? List.of() : quizItems;
+        if (ctype == ContentType.QUIZ) {
+            if (coercedItems.isEmpty()) {
+                throw new DomainInvariantException(
+                        "Content of ctype=QUIZ must carry at least one QuizItem");
+            }
+        } else {
+            if (!coercedItems.isEmpty()) {
+                throw new DomainInvariantException(
+                        "Content of ctype=" + ctype + " must not carry quiz items, got "
+                                + coercedItems.size());
+            }
+        }
         this.id = id;
         this.topicId = topicId;
         this.title = trimmedTitle;
@@ -158,13 +178,17 @@ public final class Content {
         this.tags = normaliseTags(tags);
         this.createdBy = createdBy;
         this.audit = audit;
+        this.quizItems = List.copyOf(coercedItems);
     }
 
     /**
-     * Reconstructs a content item from persisted state. Accepts any
-     * {@link ContentType} (including {@link ContentType#QUIZ}); the
-     * draft-path validation that refuses QUIZ lives on
-     * {@link ContentDraft}, not here. All other invariants still run.
+     * Reconstructs a non-quiz content item from persisted state. Accepts
+     * any {@link ContentType} <i>except</i> {@link ContentType#QUIZ} —
+     * for QUIZ, callers must use the {@link #rehydrate(ContentId, TopicId,
+     * String, ContentType, Difficulty, int, String, Optional, Set,
+     * Optional, AuditFields, List)} overload that takes the item list.
+     * (Calling this 11-arg form with {@code ctype=QUIZ} would throw
+     * because empty items violate the QUIZ-coupling invariant.)
      */
     public static Content rehydrate(
             ContentId id,
@@ -178,6 +202,39 @@ public final class Content {
             Set<String> tags,
             Optional<UserId> createdBy,
             AuditFields audit) {
+        return rehydrate(
+                id,
+                topicId,
+                title,
+                ctype,
+                difficulty,
+                estMinutes,
+                url,
+                description,
+                tags,
+                createdBy,
+                audit,
+                List.of());
+    }
+
+    /**
+     * Reconstructs a content item from persisted state, including QUIZ
+     * items. The QUIZ-coupling invariant (items present iff
+     * {@code ctype=QUIZ}) is checked by the canonical constructor.
+     */
+    public static Content rehydrate(
+            ContentId id,
+            TopicId topicId,
+            String title,
+            ContentType ctype,
+            Difficulty difficulty,
+            int estMinutes,
+            String url,
+            Optional<String> description,
+            Set<String> tags,
+            Optional<UserId> createdBy,
+            AuditFields audit,
+            List<QuizItem> quizItems) {
         if (description == null) {
             throw new DomainValidationException(
                     "Content description must not be null"
@@ -194,7 +251,8 @@ public final class Content {
                 description.orElse(null),
                 tags,
                 createdBy,
-                audit);
+                audit,
+                quizItems);
     }
 
     static Set<String> normaliseTags(Set<String> tags) {
@@ -251,6 +309,14 @@ public final class Content {
 
     public Set<String> tags() {
         return tags;
+    }
+
+    /**
+     * Unmodifiable view of the quiz items. Empty list for non-QUIZ content;
+     * never null.
+     */
+    public List<QuizItem> quizItems() {
+        return quizItems;
     }
 
     public Optional<UserId> createdBy() {

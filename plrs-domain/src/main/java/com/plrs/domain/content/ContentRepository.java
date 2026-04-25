@@ -76,4 +76,19 @@ public interface ContentRepository {
      * (§3.c.1.3) without materialising the full aggregate.
      */
     boolean existsByTopicIdAndTitle(TopicId topicId, String title);
+
+    /**
+     * Persists a quiz atomically: the {@code content} row (with
+     * {@code ctype=QUIZ}), every {@code quiz_items} row, and every
+     * {@code quiz_item_options} row in one transaction. Throws
+     * {@link org.springframework.dao.DataIntegrityViolationException} on
+     * duplicate {@code (topic_id, title)} or on a deferred TRG-2
+     * violation at commit.
+     *
+     * <p>Returns a {@link Content} of {@code ctype=QUIZ} with its items
+     * populated.
+     *
+     * <p>Traces to: §3.b.5.1 (TRG-1 ctype-quiz coupling), FR-19.
+     */
+    Content saveQuiz(QuizContentDraft draft);
 }
