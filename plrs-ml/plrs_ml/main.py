@@ -8,6 +8,7 @@ from . import __version__
 from .auth import HmacAuthMiddleware
 from .cache import cache
 from .cf import recompute_cf
+from .eval import run_eval
 from .features import rebuild_tfidf
 
 app = FastAPI(title="PLRS ML", version=__version__)
@@ -32,6 +33,11 @@ async def features_rebuild() -> dict:
 @app.post("/cf/recompute")
 async def cf_recompute() -> dict:
     return recompute_cf()
+
+
+@app.post("/eval/run")
+async def eval_run(variant: str = "hybrid_v1", k: int = 10) -> dict:
+    return run_eval(variant, k)
 
 
 @app.get("/cf/similar")
