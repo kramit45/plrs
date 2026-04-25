@@ -254,6 +254,7 @@ class ItemSimilarityJobIT {
                                     + "com\\.plrs\\.infrastructure\\.recommendation\\.Redis.*|"
                                     + "com\\.plrs\\.infrastructure\\.recommendation\\.TfIdf.*|"
                                     + "com\\.plrs\\.infrastructure\\.recommendation\\.CfGoldenIT.*|"
+                                    + "com\\.plrs\\.infrastructure\\.recommendation\\.RecommendationPipelineGoldenIT.*|"
                                     + "com\\.plrs\\.infrastructure\\.recommendation\\.TfIdfBuildJobIT.*"))
     static class SimJobITApp {
 

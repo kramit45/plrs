@@ -172,6 +172,7 @@ class TfIdfBuildJobIT {
                                     + "RedisCbScorer|RedisTopNCacheStore|"
                                     + "ItemSimilarityJob|"
                                     + "CfGoldenIT.*|ItemSimilarityJobIT.*|"
+                                    + "RecommendationPipelineGoldenIT.*|"
                                     + "SpringDataArtifactRepositoryIT.*|"
                                     + "SpringDataRecommendationRepositoryIT.*)"))
     static class TfIdfITApp {
