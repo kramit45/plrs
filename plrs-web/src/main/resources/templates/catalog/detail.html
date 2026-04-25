@@ -34,6 +34,9 @@
     <p class="mb-4">
         <a th:href="${item.url()}" target="_blank" rel="noopener"
            class="btn btn-primary">Open content</a>
+        <a th:if="${item.ctype().name() == 'QUIZ' and isStudent}"
+           th:href="@{/quiz/{id}/attempt(id=${item.id().value()})}"
+           class="btn btn-success ms-2">Attempt this quiz</a>
     </p>
 
     <section class="mb-4">

@@ -17,6 +17,10 @@
         (<span th:text="${result.score()}">0.00</span>%)
     </h2>
 
+    <p class="mb-4">
+        <a th:href="@{/dashboard}" class="btn btn-primary">Go to dashboard</a>
+    </p>
+
     <div class="list-group">
         <div class="list-group-item" th:each="fb : ${resolvedFeedback}">
             <div class="d-flex justify-content-between align-items-start mb-1">
