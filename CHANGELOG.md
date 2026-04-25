@@ -5,6 +5,85 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.2.0] — Iteration 2 — 2026-04-25
+
+The second iteration delivers the catalogue, interaction tracking,
+quiz scoring, EWMA mastery update inside TX-01, an `@Auditable` AOP
+aspect, and a Chart.js student dashboard. 53 commits on `main`, all
+green in CI.
+
+### Features — domain
+
+- `38aa6f3` feat(domain): add TopicId typed value object
+- `d6c04c6` feat(domain): add ContentId typed value object
+- `1919abc` feat(domain): add Rating value object bounded to [1,5]
+- `46fbb75` feat(domain): add MasteryScore value object with blendWith EWMA helper
+- `e4fb2fa` feat(domain): add Topic aggregate and TopicDraft transient form
+- `c1b4349` feat(domain): add TopicRepository port
+- `6295ff0` feat(domain): add ContentType and Difficulty enums
+- `df9ecfd` feat(domain): add Content aggregate and ContentDraft (non-quiz ctypes)
+- `2750255` feat(domain): add ContentRepository port with search contract
+- `cc06fec` feat(domain): add PrerequisiteEdge, CycleDetectedException, and Content.canAddPrerequisite
+- `6c77918` feat(domain): add EventType and InteractionEvent value types with per-type field invariants
+- `8e452d0` feat(domain): add QuizItemOption value record
+- `2f154bd` feat(domain): add QuizItem entity with exactly-one-correct-option invariant
+- `5496d07` feat(domain): add QuizContentDraft and Content QUIZ-ctype coupling invariants
+- `db31b06` feat(domain): add AnswerSubmission, PerItemFeedback, and QuizAttempt aggregate
+- `d40d659` feat(domain): add Content.score returning QuizAttempt with per-topic weights
+- `7a6bbd5` feat(domain): add UserSkill aggregate with applyEwma and confidence increment
+
+### Features — application
+
+- `333ca1f` feat(application): add CreateTopicUseCase and CreateContentUseCase
+- `17356d7` feat(application): add AddPrerequisiteUseCase with SERIALIZABLE isolation and retry-once
+- `2eb3be0` feat(application): add RecordInteractionUseCase with FR-15 10-minute VIEW debounce
+- `8ca865a` feat(application): add OutboxEvent value type and OutboxRepository port
+- `c61b190` feat(application): add SubmitQuizAttemptUseCase skeleton with advisory lock and PersistedQuizAttempt
+- `609376d` feat(application): complete SubmitQuizAttemptUseCase — EWMA + version bump + outbox (TX-01, step 90)
+- `1a41ffa` feat(application): add TopNCache port and post-commit Redis invalidation in quiz submit
+- `7da6519` feat(application): add StudentDashboardService aggregating mastery, completions, and attempts
+- `9b5cd23` feat(application): add @Auditable aspect and audit_log persistence with TRG-4 append-only
+
+### Features — infrastructure
+
+- `3f57afa` feat(infra): add flyway v4 migration creating plrs_ops.topics
+- `4d52f5c` feat(infra): add SpringDataTopicRepository adapter with mapper and IT
+- `c1ae550` feat(infra): add flyway v5 migration for content and content_tags with GIN search index
+- `b64888f` feat(infra): add ContentJpaEntity with tag ElementCollection and ContentMapper
+- `a930d2a` feat(infra): add SpringDataContentRepository with tsvector-based FR-13 search
+- `fd1418f` feat(infra): add flyway v7 migration creating plrs_ops.prerequisites
+- `6b322fa` feat(infra): add SpringDataPrerequisiteRepository with recursive-CTE cycle detection
+- `11e6928` feat(infra): add flyway v8 migration creating plrs_ops.interactions with three CHECK constraints
+- `0a9565d` feat(infra): add flyway v9 migration creating plrs_ops.outbox_event
+- `cc7ee00` feat(infra): add SpringDataOutboxRepository adapter, OutboxPublisher port, and LoggingOutboxPublisher no-op
+- `7795041` feat(infra): add scheduled OutboxDrainJob with configurable batch size and fixed delay
+- `80d622b` feat(infra): add flyway v10 quiz_items + quiz_item_options with TRG-1 ctype-coupling and TRG-2 deferred-exactly-one-correct
+- `f3f0ea8` feat(infra): add flyway v11 quiz_attempts + JPA adapter with JSONB serialisation
+- `a940954` feat(infra): add flyway v12 user_skills + user_skills_version column + TRG-3
+- `5deaf6f` feat(infra): add UserSkillRepository adapter and UserRepository.bumpSkillsVersion
+
+### Features — web
+
+- `997a299` feat(web): add REST /api/topics and /api/content with INSTRUCTOR/ADMIN guards and cycle-path problem details
+- `35743b2` feat(web): add GET /api/content/search with clamped pagination
+- `ebfcd08` feat(web): add Thymeleaf /catalog browse view with search and pagination
+- `f7d4627` feat(web): add Thymeleaf /catalog/{id} detail view with prereqs and dependents
+- `b23b43b` feat(web): add POST /api/interactions and /web-api/interactions with STUDENT guard and view beacon script
+- `943a410` feat(web): add /api/quiz-attempts and Thymeleaf attempt + result views with is-correct stripped from view models
+- `f2983ca` feat(web): add /dashboard with Chart.js mastery radar and recent activity tables
+- `fa267dd` feat(web): add /web-api/me/activity-weekly endpoint and dashboard sparkline
+- `0649b6e` feat(web): consolidate @PreAuthorize coverage on Iter 2 endpoints with role-matrix IT
+
+### Tests — architecture and e2e
+
+- `6078aa7` test(arch): enforce outbox writes occur inside @Transactional classes (TX-01)
+- `27c1ac7` test(e2e): add Iter 2 Newman collection covering catalog, interactions, quiz flows
+- `d22db50` test(e2e): add Playwright student demo flow exercising register→quiz→dashboard
+
+### Docs
+
+- (this commit) docs: iteration 2 readme, changelog, and demo script
+
 ## [Iteration 1] — 2026-04-24
 
 The first iteration delivers a "walking skeleton" plus the full

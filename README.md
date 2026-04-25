@@ -10,11 +10,16 @@ into a single deployable Java application.
 
 ## Status
 
-**Iteration 1 complete — walking skeleton with authentication.** The
-codebase boots as a Spring Boot application, persists users against
-PostgreSQL, issues RS256 JWTs, serves server-rendered Thymeleaf views
-alongside a JSON API, and is verified end-to-end via Playwright
-(browser) and Newman (HTTP).
+**Iteration 2 complete — catalogue, interactions, quiz, mastery (EWMA).**
+Building on the Iter 1 walking skeleton, Iter 2 adds the full content
+catalogue (topics, content, prerequisites with cycle detection, GIN
+full-text search), implicit-feedback interaction tracking with the
+FR-15 10-minute VIEW debounce, server-authoritative quiz scoring, the
+EWMA mastery update inside the TX-01 transactional invariant (mastery
+upsert + version bump + outbox event in one transaction), a
+post-commit Redis cache-invalidation hook, an `@Auditable` AOP aspect
+writing to an append-only `audit_log`, and a student dashboard with a
+Chart.js mastery radar plus an 8-week activity sparkline.
 
 ## Prerequisites
 
@@ -48,8 +53,15 @@ Four Maven modules, hexagonal layering enforced by ArchUnit:
 Persistence and transport:
 
 - **PostgreSQL 15**, two schemas — `plrs_ops` (operational: users,
-  user_roles) and `plrs_dw` (warehouse, reserved for Iter 2+). Schema
-  migrations run by Flyway (V1 baseline, V2 users, V3 user_roles).
+  user_roles, topics, content, content_tags, prerequisites,
+  interactions, outbox_event, quiz_items, quiz_item_options,
+  quiz_attempts, user_skills, audit_log) and `plrs_dw` (warehouse,
+  reserved for Iter 3 reporting). Migrations run by Flyway: V1
+  baseline, V2 users, V3 user_roles, V4 topics, V5 content + GIN
+  search, V6 content audit actor, V7 prerequisites, V8 interactions,
+  V9 outbox_event, V10 quiz_items + quiz_item_options (TRG-1, TRG-2),
+  V11 quiz_attempts, V12 user_skills (TRG-3), V13 audit_log (TRG-4
+  append-only).
 - **Redis 7** — backs the refresh-token allow-list.
 - **JWT RS256** — 2h access tokens, 30d refresh tokens with jti tracked
   in Redis. Keys are PEM-supplied in prod (`PLRS_JWT_PRIVATE_KEY_PEM` /
@@ -93,23 +105,29 @@ DB_URL=jdbc:postgresql://localhost:55432/plrs mvn -pl plrs-web spring-boot:run
 
 ## Demo script (viva)
 
-1. Open `http://localhost:8080/register`, enter a fresh email plus a
-   password of at least 10 chars mixing letters and digits (e.g.
-   `Password01`). Submit.
-2. Redirected to `/login?registered` with a success banner. Enter the
-   same credentials and log in.
-3. Redirected to `/`, which now shows **Signed in as
-   *<your-email>*** with a `ROLE_STUDENT` badge.
-4. Click the **Log out** button in the nav; redirected to
-   `/login?logout` with a confirmation banner.
-5. (API) In a second terminal, run the same flow headlessly:
+The full step-by-step walkthrough lives in
+[DEMO_SCRIPT.md](DEMO_SCRIPT.md). A one-paragraph summary:
+
+1. Boot Postgres + Redis, then `mvn -pl plrs-web spring-boot:run`.
+2. Load the seeded INSTRUCTOR + demo quiz via
+   `psql … -f test/newman/seed.sql`.
+3. As an instructor (the seeded user), POST a topic and a VIDEO via
+   the JSON API.
+4. As a fresh student, browse `/catalog`, open the seeded quiz, click
+   **Attempt this quiz**, submit, then **Go to dashboard** to see the
+   Chart.js radar populated by the EWMA update and the activity
+   sparkline.
+5. Run the headless equivalents:
 
    ```bash
-   ./test/newman/run.sh
+   ./test/newman/run.sh         # Iter 1 register/login/me/logout
+   ./test/newman/run-iter2.sh   # Iter 2 catalog/interactions/quiz
    ```
 
-   The five-request Newman collection exercises register → login →
-   authenticated `/api/me` → logout → logout-again (idempotency proof).
+6. Cross-check the database: `user_skills` has the EWMA row,
+   `audit_log` has rows for `USER_REGISTERED`, `INTERACTION_RECORDED`,
+   `QUIZ_ATTEMPTED`, and `outbox_event` has a `QUIZ_ATTEMPTED`
+   payload pending publication.
 
 ## Testing
 
@@ -137,42 +155,67 @@ What `mvn verify` covers:
 - `plrs-web`: `@WebMvcTest` slices for every controller and filter
   plus a security-routing slice that drives the full filter chain.
 
-## Iteration 1 scope
+## Iteration 2 scope
 
 **Included**
 
-- Walking skeleton: 4 Maven modules, GitHub Actions CI, PostgreSQL +
-  Flyway, Redis, JSON logs with request-id correlation, ArchUnit rules
-  enforcing domain purity and layered dependency direction.
-- Domain: `User` aggregate with `STUDENT` / `INSTRUCTOR` / `ADMIN`
-  additive roles, value objects (`UserId`, `Email`, `BCryptHash`,
-  `AuditFields`), `PasswordPolicy`, `DomainValidationException`
-  hierarchy.
-- Auth: BCrypt cost-12 hashing, RS256 JWT issuance + verification,
-  Redis-backed refresh-token allow-list, constant-time login flow
-  resistant to account enumeration.
-- Web: `POST /api/auth/{register,login,logout}`, `GET /api/me`,
-  Thymeleaf `/register` + `/login` + `/` views with Bootstrap 5 CSS.
-- Security: two Spring Security chains (JWT + form login), CSRF on web
-  routes, CORS on `/api/**`, full header hardening (HSTS, CSP, etc.).
-- Testing: Playwright browser E2E (register → login → home → logout)
-  and Newman API E2E (5-request collection).
+- Full catalogue: topics, content (4 ctypes — VIDEO, ARTICLE,
+  EXERCISE, QUIZ), tags, prerequisites with cycle detection at
+  SERIALIZABLE isolation + retry-once.
+- Full-text search via Postgres GIN tsvector (`/api/content/search`,
+  `/catalog`).
+- Implicit-feedback interaction recording with the FR-15 10-minute
+  VIEW debounce and an idempotent composite-PK contract.
+- Server-authoritative quiz scoring (`Content.score`) with per-topic
+  weight rounding correction; Iter 1 quiz authoring is partial — the
+  domain side (`QuizContentDraft`, `QuizItem`, `QuizItemOption`) and
+  the schema (TRG-1 ctype-coupling, TRG-2 deferred exactly-one-correct)
+  are wired, but the `/api/content/quiz` HTTP endpoint is deferred to
+  Iter 3 alongside the recommender — the demo quiz is seeded via SQL.
+- EWMA mastery update with confidence increment, gated by an advisory
+  lock and committed atomically with the quiz attempt, the
+  `users.user_skills_version` bump (TRG-3 monotonic), and a
+  `QUIZ_ATTEMPTED` outbox row (TX-01).
+- Outbox pattern with a no-op `LoggingOutboxPublisher` and a scheduled
+  drain job (real Kafka producer is Iter 3).
+- Post-commit Redis cache-invalidation port (`TopNCache`) on the
+  recommender's per-user top-N key.
+- Student dashboard: `GET /dashboard` with Chart.js mastery radar
+  (top-6 topics by mastery DESC), recent completes (last 5), recent
+  attempts (last 10), and an 8-week activity sparkline backed by
+  `GET /web-api/me/activity-weekly`.
+- `@Auditable` AOP aspect appending to `plrs_ops.audit_log` (V13);
+  every state-changing use case is annotated, and TRG-4 enforces
+  append-only at the database boundary.
+- Method-level `@PreAuthorize` across every mutating endpoint,
+  exercised by a 20-pair `RoleMatrixIT`.
+- ArchUnit rule enforcing classes that depend on `OutboxRepository`
+  must be `@Transactional` (TX-01 structural surrogate).
 
-**Deferred to Iter 2**
+**Deferred to Iter 3**
 
-- Catalogue, interactions, quiz, mastery (EWMA).
-- Outbox pattern + Kafka for domain events.
-- Value objects for the content domain.
+- Recommender pipeline (CF + CB + MMR).
+- Python ML microservice.
+- Real Kafka producer (replacing the no-op logger).
+- Diagnostic quiz (FR-23) and `POST /api/content/quiz` authoring
+  endpoint.
+- Offline evaluation harness.
+- Warehouse star schema in `plrs_dw`.
 
 **Deferred to Iter 4 (hardening)**
 
-- Rate limiting and account lockout.
+- Learning paths (FR-31..FR-34).
+- Admin dashboard with KPIs.
+- Account lockout, email verification, password reset.
+- Rate limiting.
+- CSV bulk import / export.
 - OWASP ZAP scan and axe-core accessibility audit.
-- Email verification and password reset flows.
 
 **Deferred to Iter 5**
 
-- Load tests, chaos tests, final documentation pass.
+- JMeter load tests.
+- Chaos tests.
+- Final report integration.
 
 ## Project metadata
 
