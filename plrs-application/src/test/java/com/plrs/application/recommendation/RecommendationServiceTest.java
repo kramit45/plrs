@@ -18,9 +18,7 @@ import com.plrs.domain.mastery.MasteryScore;
 import com.plrs.domain.mastery.UserSkill;
 import com.plrs.domain.mastery.UserSkillRepository;
 import com.plrs.domain.recommendation.Recommendation;
-import com.plrs.domain.topic.Topic;
 import com.plrs.domain.topic.TopicId;
-import com.plrs.domain.topic.TopicRepository;
 import com.plrs.domain.user.UserId;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -50,10 +48,24 @@ class RecommendationServiceTest {
     @Mock private ContentRepository contentRepository;
     @Mock private UserSkillRepository userSkillRepository;
     @Mock private PrerequisiteRepository prerequisiteRepository;
-    @Mock private TopicRepository topicRepository;
     @Mock private PopularityScorer popularityScorer;
     @Mock private HybridRanker hybridRanker;
     @Mock private MmrReranker mmrReranker;
+    @Mock private ExplanationTemplate explanationTemplate;
+
+    @org.junit.jupiter.api.BeforeEach
+    void explanationDefaultsToConstantString() {
+        // Reason text is the ExplanationTemplate's job; the service
+        // tests just check the wiring exists. Use a fixed value so
+        // schema-bounded asserts still pass.
+        lenient()
+                .when(
+                        explanationTemplate.explain(
+                                org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any()))
+                .thenReturn("test reason");
+    }
 
     @org.junit.jupiter.api.BeforeEach
     void mmrPassesThroughByDefault() {
@@ -106,10 +118,10 @@ class RecommendationServiceTest {
                 contentRepository,
                 userSkillRepository,
                 prerequisiteRepository,
-                topicRepository,
                 popularityScorer,
                 hybridRanker,
                 mmrReranker,
+                explanationTemplate,
                 CLOCK);
     }
 
@@ -131,22 +143,6 @@ class RecommendationServiceTest {
     private UserSkill skill(TopicId topic, double mastery) {
         return UserSkill.rehydrate(
                 USER, topic, MasteryScore.of(mastery), new BigDecimal("0.500"), T0);
-    }
-
-    private Topic topic(long id, String name) {
-        return Topic.rehydrate(
-                TopicId.of(id),
-                name,
-                "desc",
-                Optional.empty(),
-                AuditFields.initial("system", CLOCK));
-    }
-
-    private void stubTopicLookups() {
-        lenient().when(topicRepository.findById(TOPIC_A))
-                .thenReturn(Optional.of(topic(1L, "Algebra")));
-        lenient().when(topicRepository.findById(TOPIC_B))
-                .thenReturn(Optional.of(topic(2L, "Calculus")));
     }
 
     @Test
@@ -174,7 +170,6 @@ class RecommendationServiceTest {
         when(contentRepository.findById(ContentId.of(10L))).thenReturn(Optional.of(prereqContent));
         when(popularityScorer.score(any()))
                 .thenReturn(Map.of(ContentId.of(10L), 0.9, ContentId.of(30L), 0.8));
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 5, "popularity_v1");
 
@@ -206,7 +201,6 @@ class RecommendationServiceTest {
                             }
                             return out;
                         });
-        stubTopicLookups();
 
         // k=2 matches the surviving feasible set; backfill from the
         // (full pool - emitted) would add the filtered-out ADVANCED
@@ -239,7 +233,6 @@ class RecommendationServiceTest {
                             }
                             return out;
                         });
-        stubTopicLookups();
 
         // k=1 matches the single BEGINNER survivor — keeps the
         // assertion focused on the filter, not the FR-30 backfill.
@@ -265,7 +258,6 @@ class RecommendationServiceTest {
                                 ContentId.of(1L), 0.10,
                                 ContentId.of(2L), 0.55,
                                 ContentId.of(3L), 0.95));
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 5, "popularity_v1");
 
@@ -278,27 +270,6 @@ class RecommendationServiceTest {
         // HybridRanker's cold-start branch surfaces popularity as-is
         // (0.95) when CF and CB are absent — no more halving.
         assertThat(recs.get(0).score().value()).isEqualTo(0.95);
-    }
-
-    @Test
-    void reasonTextStaysWithin200Chars() {
-        Content c = content(1L, TOPIC_A, Difficulty.BEGINNER, "x");
-        when(contentRepository.findAllNonQuiz(200)).thenReturn(List.of(c));
-        when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
-        when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
-        when(popularityScorer.score(any())).thenReturn(Map.of(ContentId.of(1L), 0.9));
-        // Topic name 250 chars long — service must truncate.
-        Topic huge = Topic.rehydrate(
-                TOPIC_A,
-                "T".repeat(120),
-                "d",
-                Optional.empty(),
-                AuditFields.initial("system", CLOCK));
-        when(topicRepository.findById(TOPIC_A)).thenReturn(Optional.of(huge));
-
-        List<Recommendation> recs = service().generate(USER, 1, "popularity_v1");
-
-        assertThat(recs.get(0).reason().text().length()).isLessThanOrEqualTo(200);
     }
 
     @Test
@@ -315,7 +286,6 @@ class RecommendationServiceTest {
                                 ContentId.of(1L), 0.9,
                                 ContentId.of(2L), 0.5,
                                 ContentId.of(3L), 0.1));
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 2, "popularity_v1");
 
@@ -365,7 +335,6 @@ class RecommendationServiceTest {
                             }
                             return out;
                         });
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 3, "popularity_v1");
 
@@ -394,7 +363,6 @@ class RecommendationServiceTest {
         when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
         when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
         when(popularityScorer.score(any())).thenReturn(Map.of(ContentId.of(1L), 0.5));
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 1, "experiment_a");
 
@@ -418,7 +386,6 @@ class RecommendationServiceTest {
                                 ContentId.of(1L), new Blended(0.25, 0.0, 0.0, 0.5, false),
                                 ContentId.of(2L), new Blended(0.70, 0.9, 0.5, 0.5, false),
                                 ContentId.of(3L), new Blended(0.25, 0.0, 0.0, 0.5, false)));
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 3, "hybrid_v1");
 
@@ -452,7 +419,6 @@ class RecommendationServiceTest {
                         org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(
                         List.of(ContentId.of(1L), ContentId.of(3L), ContentId.of(2L)));
-        stubTopicLookups();
 
         List<Recommendation> recs = service().generate(USER, 3, "hybrid_v1");
 
@@ -462,18 +428,4 @@ class RecommendationServiceTest {
                 .containsExactly(1L, 3L, 2L);
     }
 
-    @Test
-    void reasonTextReflectsCfBlend() {
-        Content a = content(1L, TOPIC_A, Difficulty.BEGINNER, "a");
-        when(contentRepository.findAllNonQuiz(200)).thenReturn(List.of(a));
-        when(userSkillRepository.findByUser(USER)).thenReturn(List.of());
-        when(prerequisiteRepository.findDirectPrerequisitesOf(any())).thenReturn(List.of());
-        when(popularityScorer.score(any())).thenReturn(Map.of(ContentId.of(1L), 0.5));
-        stubTopicLookups();
-
-        List<Recommendation> recs = service().generate(USER, 1, "cf_v1");
-
-        assertThat(recs.get(0).reason().text())
-                .contains("Popular and similar to what you've liked");
-    }
 }

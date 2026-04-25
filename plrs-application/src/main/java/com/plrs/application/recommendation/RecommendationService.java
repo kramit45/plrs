@@ -11,9 +11,7 @@ import com.plrs.domain.mastery.UserSkillRepository;
 import com.plrs.domain.recommendation.Recommendation;
 import com.plrs.domain.recommendation.RecommendationReason;
 import com.plrs.domain.recommendation.RecommendationScore;
-import com.plrs.domain.topic.Topic;
 import com.plrs.domain.topic.TopicId;
-import com.plrs.domain.topic.TopicRepository;
 import com.plrs.domain.user.UserId;
 import java.time.Clock;
 import java.time.Instant;
@@ -64,34 +62,31 @@ public class RecommendationService {
     /** Mastery threshold above which a prereq is considered "met". */
     public static final double PREREQ_MASTERY_THRESHOLD = 0.60;
 
-    /** Maximum reason text length, bounded by the schema column. */
-    public static final int MAX_REASON_LENGTH = RecommendationReason.MAX_LENGTH;
-
     private final ContentRepository contentRepository;
     private final UserSkillRepository userSkillRepository;
     private final PrerequisiteRepository prerequisiteRepository;
-    private final TopicRepository topicRepository;
     private final PopularityScorer popularityScorer;
     private final HybridRanker hybridRanker;
     private final MmrReranker mmrReranker;
+    private final ExplanationTemplate explanationTemplate;
     private final Clock clock;
 
     public RecommendationService(
             ContentRepository contentRepository,
             UserSkillRepository userSkillRepository,
             PrerequisiteRepository prerequisiteRepository,
-            TopicRepository topicRepository,
             PopularityScorer popularityScorer,
             HybridRanker hybridRanker,
             MmrReranker mmrReranker,
+            ExplanationTemplate explanationTemplate,
             Clock clock) {
         this.contentRepository = contentRepository;
         this.userSkillRepository = userSkillRepository;
         this.prerequisiteRepository = prerequisiteRepository;
-        this.topicRepository = topicRepository;
         this.popularityScorer = popularityScorer;
         this.hybridRanker = hybridRanker;
         this.mmrReranker = mmrReranker;
+        this.explanationTemplate = explanationTemplate;
         this.clock = clock;
     }
 
@@ -174,7 +169,7 @@ public class RecommendationService {
                 continue;
             }
             Blended b = blended.get(cid);
-            out.add(buildRecommendation(userId, c, b.score(), rank++, modelVariant, now));
+            out.add(buildRecommendation(userId, c, b, rank++, modelVariant, now));
             breakdowns.put(cid, new ScoreBreakdown(b.popularity(), b.cf(), b.cb(), b.score()));
         }
 
@@ -209,9 +204,10 @@ public class RecommendationService {
                     continue;
                 }
                 double popOnly = fallbackScores.get(cid);
+                Blended fallback = new Blended(popOnly, 0.0, 0.0, popOnly, true);
                 out.add(
                         buildRecommendation(
-                                userId, c, popOnly, rank++, modelVariant, now));
+                                userId, c, fallback, rank++, modelVariant, now));
                 breakdowns.put(cid, new ScoreBreakdown(popOnly, 0.0, 0.0, popOnly));
             }
         }
@@ -252,32 +248,23 @@ public class RecommendationService {
     private Recommendation buildRecommendation(
             UserId userId,
             Content c,
-            double rawScore,
+            Blended blended,
             int rank,
             String modelVariant,
             Instant now) {
-        String topicName =
-                topicRepository.findById(c.topicId()).map(Topic::name).orElse("(unknown)");
-        String reason =
-                truncateReason(
-                        "Popular and similar to what you've liked in " + topicName);
+        String reason = explanationTemplate.explain(c.id(), blended, userId);
+        // Defensive trim — ExplanationTemplate truncates already, but
+        // the schema column is the contract.
+        if (reason.length() > RecommendationReason.MAX_LENGTH) {
+            reason = reason.substring(0, RecommendationReason.MAX_LENGTH);
+        }
         return Recommendation.create(
                 userId,
                 c.id(),
-                RecommendationScore.of(rawScore),
+                RecommendationScore.of(blended.score()),
                 rank,
                 new RecommendationReason(reason),
                 modelVariant,
                 Clock.fixed(now, java.time.ZoneOffset.UTC));
-    }
-
-    private static String truncateReason(String text) {
-        if (text == null) {
-            return "Recommended for you";
-        }
-        if (text.length() <= MAX_REASON_LENGTH) {
-            return text;
-        }
-        return text.substring(0, MAX_REASON_LENGTH);
     }
 }
