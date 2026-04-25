@@ -1,6 +1,7 @@
 package com.plrs.infrastructure.interaction;
 
 import com.plrs.domain.content.ContentId;
+import com.plrs.domain.interaction.EventType;
 import com.plrs.domain.interaction.InteractionEvent;
 import com.plrs.domain.interaction.InteractionRepository;
 import com.plrs.domain.interaction.Rating;
@@ -8,7 +9,10 @@ import com.plrs.domain.user.UserId;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -63,5 +67,31 @@ public class SpringDataInteractionRepository implements InteractionRepository {
     @Override
     public boolean existsViewSince(UserId userId, ContentId contentId, Instant since) {
         return jpa.existsRecentView(userId.value(), contentId.value(), since);
+    }
+
+    @Override
+    public List<InteractionEvent> findRecentCompletes(UserId userId, int limit) {
+        if (limit < 0) {
+            throw new IllegalArgumentException("limit must be >= 0, got " + limit);
+        }
+        if (limit == 0) {
+            return List.of();
+        }
+        return jpa.findRecentCompletes(userId.value(), PageRequest.of(0, limit)).stream()
+                .map(SpringDataInteractionRepository::toDomain)
+                .toList();
+    }
+
+    private static InteractionEvent toDomain(InteractionJpaEntity e) {
+        if (e.getEventType() != EventType.COMPLETE) {
+            throw new IllegalStateException(
+                    "findRecentCompletes returned non-COMPLETE event: " + e.getEventType());
+        }
+        return InteractionEvent.complete(
+                UserId.of(e.getUserId()),
+                ContentId.of(e.getContentId()),
+                e.getOccurredAt(),
+                Optional.ofNullable(e.getDwellSec()),
+                Optional.ofNullable(e.getClientInfo()));
     }
 }

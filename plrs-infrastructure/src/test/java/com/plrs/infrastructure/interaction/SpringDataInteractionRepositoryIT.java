@@ -189,6 +189,40 @@ class SpringDataInteractionRepositoryIT extends PostgresTestBase {
     }
 
     @Test
+    void findRecentCompletesReturnsCompleteEventsDescByOccurredAt() {
+        Instant t0 = Instant.parse("2026-04-25T10:00:00Z");
+        // Mix one VIEW (must be filtered out) with three COMPLETEs at
+        // staggered times.
+        interactionRepository.save(
+                InteractionEvent.view(
+                        userId, contentId, t0.minusSeconds(30), Optional.empty(), Optional.empty()));
+        interactionRepository.save(
+                InteractionEvent.complete(
+                        userId, contentId, t0.minusSeconds(180), Optional.empty(), Optional.empty()));
+        interactionRepository.save(
+                InteractionEvent.complete(
+                        userId, contentId, t0.minusSeconds(60), Optional.empty(), Optional.empty()));
+        interactionRepository.save(
+                InteractionEvent.complete(
+                        userId, contentId, t0.minusSeconds(120), Optional.empty(), Optional.empty()));
+        em.flush();
+
+        var recent = interactionRepository.findRecentCompletes(userId, 5);
+
+        assertThat(recent).hasSize(3);
+        assertThat(recent)
+                .extracting(InteractionEvent::occurredAt)
+                .containsExactly(
+                        t0.minusSeconds(60), t0.minusSeconds(120), t0.minusSeconds(180));
+        assertThat(recent)
+                .allSatisfy(
+                        e ->
+                                assertThat(e.eventType())
+                                        .isEqualTo(
+                                                com.plrs.domain.interaction.EventType.COMPLETE));
+    }
+
+    @Test
     void saveDuplicateCompositeKeyRaisesDataIntegrityViolation() {
         Instant t0 = Instant.parse("2026-04-25T10:00:00Z");
         interactionRepository.save(

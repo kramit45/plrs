@@ -3,6 +3,7 @@ package com.plrs.domain.interaction;
 import com.plrs.domain.content.ContentId;
 import com.plrs.domain.user.UserId;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Domain port for the implicit-feedback event stream. The adapter (step
@@ -34,4 +35,11 @@ public interface InteractionRepository {
      * has {@code occurredAt > since}. Used by the FR-15 debounce check.
      */
     boolean existsViewSince(UserId userId, ContentId contentId, Instant since);
+
+    /**
+     * Returns the most recent COMPLETE events for {@code userId},
+     * ordered by {@code occurredAt} DESC and capped at {@code limit}.
+     * Backs the FR-35 dashboard "recent completions" card.
+     */
+    List<InteractionEvent> findRecentCompletes(UserId userId, int limit);
 }

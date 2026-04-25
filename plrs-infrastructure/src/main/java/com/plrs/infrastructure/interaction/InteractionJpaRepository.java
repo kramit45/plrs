@@ -1,7 +1,9 @@
 package com.plrs.infrastructure.interaction;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,4 +28,12 @@ public interface InteractionJpaRepository
             @Param("userId") UUID userId,
             @Param("contentId") Long contentId,
             @Param("since") Instant since);
+
+    @Query(
+            "SELECT i FROM InteractionJpaEntity i"
+                    + " WHERE i.userId = :userId"
+                    + "   AND i.eventType = com.plrs.domain.interaction.EventType.COMPLETE"
+                    + " ORDER BY i.occurredAt DESC")
+    List<InteractionJpaEntity> findRecentCompletes(
+            @Param("userId") UUID userId, Pageable pageable);
 }
