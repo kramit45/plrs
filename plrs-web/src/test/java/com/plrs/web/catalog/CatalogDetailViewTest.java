@@ -165,7 +165,7 @@ class CatalogDetailViewTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("isStudent", true))
                 .andExpect(content().string(containsString("Your interactions")))
-                .andExpect(content().string(containsString("step 72")));
+                .andExpect(content().string(containsString("View beacon active")));
     }
 
     @Test

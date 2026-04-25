@@ -70,9 +70,45 @@
             <p class="card-text mb-1 text-muted">
                 Your interactions will appear here once you view this content.
             </p>
-            <p class="card-text small text-muted mb-0">(wiring: step 72)</p>
+            <p class="card-text small text-muted mb-0">View beacon active.</p>
         </div>
     </section>
+
+    <script th:if="${isStudent}" th:inline="javascript">
+        /*<![CDATA[*/
+        (function () {
+            var contentId = /*[[${item.id().value()}]]*/ 0;
+
+            // Read XSRF-TOKEN cookie set by Spring Security's
+            // CookieCsrfTokenRepository.withHttpOnlyFalse() on the web chain.
+            function csrfToken() {
+                var name = 'XSRF-TOKEN=';
+                var parts = document.cookie.split(';');
+                for (var i = 0; i < parts.length; i++) {
+                    var c = parts[i].trim();
+                    if (c.indexOf(name) === 0) {
+                        return decodeURIComponent(c.substring(name.length));
+                    }
+                }
+                return '';
+            }
+
+            fetch('/web-api/interactions', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': csrfToken()
+                },
+                body: JSON.stringify({
+                    contentId: contentId,
+                    eventType: 'VIEW',
+                    clientInfo: (navigator.userAgent || '').substring(0, 200)
+                })
+            }).catch(function () { /* view-logging is best-effort */ });
+        })();
+        /*]]>*/
+    </script>
 </div>
 </body>
 </html>

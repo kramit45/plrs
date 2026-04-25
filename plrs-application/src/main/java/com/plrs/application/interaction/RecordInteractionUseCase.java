@@ -52,6 +52,17 @@ public final class RecordInteractionUseCase {
     @Transactional
     public RecordInteractionResult handle(RecordInteractionCommand cmd) {
         EventType type = EventType.fromName(cmd.eventType());
+        // Cross-field validation upfront so mismatched (eventType, field)
+        // combinations produce a 400 at the use-case boundary instead of
+        // being silently dropped by the InteractionEvent factories.
+        if (cmd.dwellSec().isPresent() && !type.allowsDwell()) {
+            throw new DomainValidationException(
+                    "dwell_sec only permitted for VIEW/COMPLETE, got " + type);
+        }
+        if (cmd.rating().isPresent() && type != EventType.RATE) {
+            throw new DomainValidationException(
+                    "rating only permitted for RATE, got " + type);
+        }
         UserId userId = UserId.of(cmd.userId());
         ContentId contentId = ContentId.of(cmd.contentId());
         Instant now = Instant.now(clock);

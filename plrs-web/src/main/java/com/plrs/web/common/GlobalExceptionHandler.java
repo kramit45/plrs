@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -157,6 +158,23 @@ public class GlobalExceptionHandler {
                 "access-denied",
                 "Forbidden",
                 "You do not have permission to perform this action");
+    }
+
+    /**
+     * Catches {@code AuthenticationCredentialsNotFoundException} and other
+     * Spring Security {@link AuthenticationException}s thrown from the
+     * method-security interceptor when there is no authenticated principal
+     * (e.g. a slice test where the filter chain is bypassed, or a request
+     * that reaches a method-secured endpoint without going through the
+     * authentication filter).
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthenticationException(AuthenticationException e) {
+        return problem(
+                HttpStatus.UNAUTHORIZED,
+                "authentication-required",
+                "Unauthorized",
+                "Authentication is required to access this resource");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
