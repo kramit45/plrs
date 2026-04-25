@@ -52,7 +52,12 @@ class QuizAttemptControllerTest {
         when(useCase.handle(any(SubmitQuizAttemptCommand.class)))
                 .thenReturn(
                         new SubmitQuizAttemptResult(
-                                99L, new BigDecimal("100.00"), 2, 2, List.of()));
+                                99L,
+                                new BigDecimal("100.00"),
+                                2,
+                                2,
+                                List.of(),
+                                List.of()));
 
         mockMvc.perform(
                         post("/api/quiz-attempts")

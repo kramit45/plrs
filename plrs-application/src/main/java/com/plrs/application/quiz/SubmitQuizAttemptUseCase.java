@@ -1,67 +1,103 @@
 package com.plrs.application.quiz;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.plrs.application.content.ContentNotFoundException;
+import com.plrs.application.outbox.OutboxEvent;
+import com.plrs.application.outbox.OutboxRepository;
 import com.plrs.domain.content.Content;
 import com.plrs.domain.content.ContentId;
 import com.plrs.domain.content.ContentRepository;
 import com.plrs.domain.content.ContentType;
+import com.plrs.domain.mastery.UserSkill;
+import com.plrs.domain.mastery.UserSkillRepository;
 import com.plrs.domain.quiz.PersistedQuizAttempt;
 import com.plrs.domain.quiz.QuizAttempt;
 import com.plrs.domain.quiz.QuizAttemptRepository;
+import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
+import com.plrs.domain.user.UserRepository;
+import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Submits one quiz attempt. Acquires a per-({@code user, quiz})
- * advisory lock at the start of the transaction (§3.b.7.2),
- * delegates scoring to {@link Content#score} (server-authoritative
- * per FR-20), and persists the resulting {@link QuizAttempt}.
- *
- * <p><strong>Skeleton — DEFERRED to step 90:</strong>
+ * Submits one quiz attempt and applies the full TX-01 transactional
+ * invariant in a single {@code @Transactional} method (§2.e.2.4.2):
  *
  * <ol>
- *   <li>EWMA mastery update per topic in {@code topicWeights}.
- *   <li>{@code users.user_skills_version} increment.
- *   <li>{@code outbox_event} row insert with {@code QUIZ_ATTEMPTED} payload.
- *   <li>Post-commit Redis cache invalidation.
+ *   <li>Acquire the per-({@code user, quiz}) advisory lock (§3.b.7.2).
+ *   <li>Score the quiz via {@link Content#score} (server-authoritative,
+ *       FR-20).
+ *   <li>Persist the {@link QuizAttempt}.
+ *   <li>For each topic in {@code attempt.topicWeights()}, EWMA-update the
+ *       learner's {@link UserSkill} with effective alpha
+ *       {@code α_effective = ALPHA_QUIZ × topicWeight} (§3.c.5.7) and
+ *       upsert it.
+ *   <li>Bump {@code users.user_skills_version} (TRG-3 enforces monotonic
+ *       increase, §3.b.5.3).
+ *   <li>Insert one {@code QUIZ_ATTEMPTED} outbox event so downstream
+ *       consumers see the change after commit (§2.e.3.6).
  * </ol>
  *
- * <p>The current implementation persists the attempt and returns the
- * result only — functionally a "scoring + persistence" step; the
- * downstream invariants of TX-01 are completed in step 90.
+ * <p>Cache invalidation is post-commit best-effort and is wired in step 91.
  *
  * <p>Gated by {@code @ConditionalOnProperty("spring.datasource.url")}
  * so the bean is not created for the no-DB smoke test.
  *
- * <p>Traces to: §3.b.7.2 (advisory lock), §3.c.6.3, FR-20 (scoring).
+ * <p>Traces to: §3.b.7.2 (advisory lock), §3.c.5.7 (EWMA), §2.e.2.4.2
+ * (TX-01), §2.e.3.6 (outbox), FR-20, FR-21.
  */
 @Service
 @ConditionalOnProperty(name = "spring.datasource.url")
 public final class SubmitQuizAttemptUseCase {
 
+    /**
+     * Base learning rate for the EWMA update (§3.c.5.7). The per-topic
+     * effective alpha is {@code ALPHA_QUIZ × topicWeight}.
+     */
+    public static final BigDecimal ALPHA_QUIZ = new BigDecimal("0.40");
+
     private final ContentRepository contentRepository;
     private final QuizAttemptRepository quizAttemptRepository;
+    private final UserSkillRepository userSkillRepository;
+    private final UserRepository userRepository;
+    private final OutboxRepository outboxRepository;
     private final AdvisoryLockService lockService;
+    private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public SubmitQuizAttemptUseCase(
             ContentRepository contentRepository,
             QuizAttemptRepository quizAttemptRepository,
+            UserSkillRepository userSkillRepository,
+            UserRepository userRepository,
+            OutboxRepository outboxRepository,
             AdvisoryLockService lockService,
+            ObjectMapper objectMapper,
             Clock clock) {
         this.contentRepository = contentRepository;
         this.quizAttemptRepository = quizAttemptRepository;
+        this.userSkillRepository = userSkillRepository;
+        this.userRepository = userRepository;
+        this.outboxRepository = outboxRepository;
         this.lockService = lockService;
+        this.objectMapper = objectMapper;
         this.clock = clock;
     }
 
     @Transactional
     public SubmitQuizAttemptResult handle(SubmitQuizAttemptCommand cmd) {
         // §3.b.7.2: per-(user, quiz) advisory lock prevents double-submit
-        // races and serialises the future EWMA mastery update.
+        // races and serialises the EWMA mastery update for this learner
+        // and quiz.
         lockService.acquireLock("quiz:" + cmd.userUuid() + ":" + cmd.quizContentId());
 
         UserId userId = UserId.of(cmd.userUuid());
@@ -79,11 +115,62 @@ public final class SubmitQuizAttemptUseCase {
         QuizAttempt attempt = quiz.score(userId, cmd.answers(), clock);
         PersistedQuizAttempt persisted = quizAttemptRepository.save(attempt);
 
+        BigDecimal scoreFraction = attempt.scoreFraction();
+        List<MasteryDelta> deltas = new ArrayList<>(attempt.topicWeights().size());
+        for (Map.Entry<TopicId, BigDecimal> entry : attempt.topicWeights().entrySet()) {
+            TopicId topicId = entry.getKey();
+            BigDecimal weight = entry.getValue();
+            double alphaEffective = ALPHA_QUIZ.multiply(weight).doubleValue();
+
+            UserSkill current =
+                    userSkillRepository
+                            .find(userId, topicId)
+                            .orElseGet(() -> UserSkill.initial(userId, topicId, clock));
+            UserSkill updated = current.applyEwma(scoreFraction, alphaEffective, clock);
+            userSkillRepository.upsert(updated);
+            deltas.add(new MasteryDelta(topicId, current.mastery(), updated.mastery()));
+        }
+
+        userRepository.bumpSkillsVersion(userId);
+
+        Instant now = Instant.now(clock);
+        outboxRepository.save(
+                OutboxEvent.pending(
+                        "QUIZ_ATTEMPTED",
+                        persisted.attemptId().toString(),
+                        serialiseEventPayload(persisted, attempt, deltas),
+                        now));
+
         return new SubmitQuizAttemptResult(
                 persisted.attemptId(),
                 attempt.score(),
                 attempt.correctCount(),
                 attempt.totalCount(),
-                attempt.perItemFeedback());
+                attempt.perItemFeedback(),
+                List.copyOf(deltas));
+    }
+
+    private String serialiseEventPayload(
+            PersistedQuizAttempt persisted, QuizAttempt attempt, List<MasteryDelta> deltas) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("attemptId", persisted.attemptId());
+        payload.put("userId", attempt.userId().value().toString());
+        payload.put("quizContentId", attempt.quizContentId().value());
+        payload.put("score", attempt.score());
+        payload.put("attemptedAt", attempt.attemptedAt().toString());
+        List<Map<String, Object>> deltaPayload = new ArrayList<>(deltas.size());
+        for (MasteryDelta d : deltas) {
+            Map<String, Object> dp = new LinkedHashMap<>();
+            dp.put("topicId", d.topicId().value());
+            dp.put("oldMastery", d.oldMastery().value());
+            dp.put("newMastery", d.newMastery().value());
+            deltaPayload.add(dp);
+        }
+        payload.put("deltas", deltaPayload);
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialise QUIZ_ATTEMPTED payload", e);
+        }
     }
 }

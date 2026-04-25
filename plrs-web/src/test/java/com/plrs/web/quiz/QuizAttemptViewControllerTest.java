@@ -159,7 +159,8 @@ class QuizAttemptViewControllerTest {
                                 2,
                                 List.of(
                                         new PerItemFeedback(1, 1, 1, true, TOPIC),
-                                        new PerItemFeedback(2, 2, 1, false, TOPIC))));
+                                        new PerItemFeedback(2, 2, 1, false, TOPIC)),
+                                List.of()));
 
         mockMvc.perform(post("/quiz/42/attempt").param("answers[1]", "1").param("answers[2]", "2"))
                 .andExpect(status().isOk())
