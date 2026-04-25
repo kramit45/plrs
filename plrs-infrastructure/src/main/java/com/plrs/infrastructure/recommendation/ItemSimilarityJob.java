@@ -2,6 +2,8 @@ package com.plrs.infrastructure.recommendation;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.plrs.application.recommendation.ArtifactPayload;
+import com.plrs.application.recommendation.ArtifactRepository;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -79,16 +81,19 @@ public class ItemSimilarityJob {
 
     private final DataSource dataSource;
     private final StringRedisTemplate redis;
+    private final ArtifactRepository artifactRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public ItemSimilarityJob(
             DataSource dataSource,
             StringRedisTemplate redis,
+            ArtifactRepository artifactRepository,
             ObjectMapper objectMapper,
             Clock clock) {
         this.dataSource = dataSource;
         this.redis = redis;
+        this.artifactRepository = artifactRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -146,12 +151,32 @@ public class ItemSimilarityJob {
         double[][] sim = matrix.itemItemCosine();
         List<Long> ids = matrix.contentIds();
 
+        Instant computedAt = Instant.now(clock);
+        String version = String.valueOf(computedAt.toEpochMilli());
         int totalNeighboursWritten = 0;
         for (int i = 0; i < nItems; i++) {
             List<SimNeighbour> neighbours = topNeighbours(i, sim, ids);
             try {
                 String json = objectMapper.writeValueAsString(neighbours);
                 redis.opsForValue().set(SIM_KEY_PREFIX + ids.get(i), json, TTL);
+                // Durable backup for cold-start rehydration. The
+                // Redis-write failure path above already logs WARN
+                // and continues; the artifact write is a separate
+                // try so the two sinks don't share a fate.
+                try {
+                    artifactRepository.upsert(
+                            ArtifactPayload.ofString(
+                                    "SIM_SLAB",
+                                    ids.get(i).toString(),
+                                    json,
+                                    version,
+                                    computedAt));
+                } catch (Exception artifactEx) {
+                    log.warn(
+                            "ItemSimilarityJob: artifact write failed for item {}",
+                            ids.get(i),
+                            artifactEx);
+                }
                 totalNeighboursWritten += neighbours.size();
             } catch (JsonProcessingException e) {
                 log.warn(

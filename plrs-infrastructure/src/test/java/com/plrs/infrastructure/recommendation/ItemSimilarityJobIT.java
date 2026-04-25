@@ -265,5 +265,29 @@ class ItemSimilarityJobIT {
         ObjectMapper objectMapper() {
             return new ObjectMapper();
         }
+
+        /**
+         * Stub artifact repository — the dual-write adapter is exercised
+         * end-to-end in {@code SpringDataArtifactRepositoryIT}; this IT
+         * focuses on the Redis side and just needs the bean to exist so
+         * ItemSimilarityJob can wire.
+         */
+        @org.springframework.context.annotation.Bean
+        com.plrs.application.recommendation.ArtifactRepository stubArtifactRepository() {
+            return new com.plrs.application.recommendation.ArtifactRepository() {
+                @Override
+                public void upsert(
+                        com.plrs.application.recommendation.ArtifactPayload payload) {
+                    // no-op
+                }
+
+                @Override
+                public java.util.Optional<
+                                com.plrs.application.recommendation.ArtifactPayload>
+                        find(String artifactType, String artifactKey) {
+                    return java.util.Optional.empty();
+                }
+            };
+        }
     }
 }
