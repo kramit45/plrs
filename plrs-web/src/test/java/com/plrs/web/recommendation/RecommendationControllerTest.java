@@ -157,13 +157,52 @@ class RecommendationControllerTest {
     @Test
     @WithMockUser(username = STUDENT_UUID, roles = "ADMIN")
     void adminQueryingAnotherUsersRecsAllowed() throws Exception {
-        when(useCase.handle(any(), anyInt())).thenReturn(List.of());
+        when(useCase.handleWithBreakdown(any(), anyInt()))
+                .thenReturn(
+                        new com.plrs.application.recommendation.RankedSlate(
+                                List.of(), java.util.Map.of()));
 
         mockMvc.perform(
                         get("/api/recommendations")
                                 .param("k", "5")
                                 .param("userId", OTHER_UUID))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = STUDENT_UUID, roles = "ADMIN")
+    void adminSeesPerComponentScoreBreakdown() throws Exception {
+        com.plrs.application.recommendation.ScoreBreakdown bd =
+                new com.plrs.application.recommendation.ScoreBreakdown(
+                        0.30, 0.70, 0.00, 0.50);
+        when(useCase.handleWithBreakdown(any(), anyInt()))
+                .thenReturn(
+                        new com.plrs.application.recommendation.RankedSlate(
+                                List.of(rec(101L, 1, 0.5)),
+                                java.util.Map.of(ContentId.of(101L), bd)));
+        when(contentRepository.findById(ContentId.of(101L)))
+                .thenReturn(java.util.Optional.of(content(101L, "Vid")));
+        when(topicRepository.findById(TOPIC)).thenReturn(java.util.Optional.of(topic()));
+
+        mockMvc.perform(get("/api/recommendations").param("k", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].breakdown.popularity").value(0.30))
+                .andExpect(jsonPath("$[0].breakdown.cf").value(0.70))
+                .andExpect(jsonPath("$[0].breakdown.cb").value(0.00))
+                .andExpect(jsonPath("$[0].breakdown.blended").value(0.50));
+    }
+
+    @Test
+    @WithMockUser(username = STUDENT_UUID, roles = "STUDENT")
+    void studentDoesNotSeeBreakdown() throws Exception {
+        when(useCase.handle(any(), anyInt())).thenReturn(List.of(rec(101L, 1, 0.9)));
+        when(contentRepository.findById(ContentId.of(101L)))
+                .thenReturn(java.util.Optional.of(content(101L, "Vid")));
+        when(topicRepository.findById(TOPIC)).thenReturn(java.util.Optional.of(topic()));
+
+        mockMvc.perform(get("/api/recommendations").param("k", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].breakdown").doesNotExist());
     }
 
     @Test

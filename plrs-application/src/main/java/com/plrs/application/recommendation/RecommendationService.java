@@ -92,7 +92,20 @@ public class RecommendationService {
         this.clock = clock;
     }
 
+    /**
+     * Back-compat entry point — most callers want the slate without
+     * per-component scores. Delegates to {@link #generateRankedSlate}.
+     */
     public List<Recommendation> generate(UserId userId, int k, String modelVariant) {
+        return generateRankedSlate(userId, k, modelVariant).items();
+    }
+
+    /**
+     * Full pipeline returning both the persisted-shape recommendations
+     * and the per-content {@link ScoreBreakdown}. The breakdown is the
+     * ADMIN-debug payload (step 116); regular callers can ignore it.
+     */
+    public RankedSlate generateRankedSlate(UserId userId, int k, String modelVariant) {
         if (k < 1) {
             throw new IllegalArgumentException("k must be >= 1, got " + k);
         }
@@ -147,6 +160,7 @@ public class RecommendationService {
                         .toList();
 
         List<Recommendation> out = new ArrayList<>(k);
+        Map<ContentId, ScoreBreakdown> breakdowns = new HashMap<>(k);
         Instant now = Instant.now(clock);
         int rank = 1;
         for (ContentId cid : ordered) {
@@ -157,7 +171,11 @@ public class RecommendationService {
             if (c == null) {
                 continue;
             }
-            out.add(buildRecommendation(userId, c, scores.get(cid), rank++, modelVariant, now));
+            double pop = popScores.getOrDefault(cid, 0.0);
+            double cf = cfScores.getOrDefault(cid, 0.0);
+            double blended = scores.get(cid);
+            out.add(buildRecommendation(userId, c, blended, rank++, modelVariant, now));
+            breakdowns.put(cid, new ScoreBreakdown(pop, cf, 0.0, blended));
         }
 
         // 6. Backfill (FR-30): if we under-filled, pad with the
@@ -190,13 +208,15 @@ public class RecommendationService {
                 if (c == null) {
                     continue;
                 }
+                double popOnly = fallbackScores.get(cid);
                 out.add(
                         buildRecommendation(
-                                userId, c, fallbackScores.get(cid), rank++, modelVariant, now));
+                                userId, c, popOnly, rank++, modelVariant, now));
+                breakdowns.put(cid, new ScoreBreakdown(popOnly, 0.0, 0.0, popOnly));
             }
         }
 
-        return out;
+        return new RankedSlate(out, breakdowns);
     }
 
     private boolean allPrereqsMet(Content c, Map<TopicId, MasteryScore> mastery) {

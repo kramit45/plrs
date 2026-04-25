@@ -1,7 +1,10 @@
 package com.plrs.web.recommendation;
 
 import com.plrs.application.recommendation.GenerateRecommendationsUseCase;
+import com.plrs.application.recommendation.RankedSlate;
+import com.plrs.application.recommendation.ScoreBreakdown;
 import com.plrs.domain.content.Content;
+import com.plrs.domain.content.ContentId;
 import com.plrs.domain.content.ContentRepository;
 import com.plrs.domain.recommendation.Recommendation;
 import com.plrs.domain.topic.Topic;
@@ -10,6 +13,7 @@ import com.plrs.domain.user.UserId;
 import com.plrs.web.common.PerUserRateLimiter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.AccessDeniedException;
@@ -92,7 +96,20 @@ public class RecommendationController {
         // own bucket).
         rateLimiter.tryAcquire(effectiveId);
 
-        List<Recommendation> recs = useCase.handle(UserId.of(effectiveId), k);
+        boolean admin = isAdmin(auth);
+        List<Recommendation> recs;
+        Map<ContentId, ScoreBreakdown> breakdowns;
+        if (admin) {
+            // ADMIN debug path: recompute (no cache) so the breakdown
+            // matches what was actually scored on this call.
+            RankedSlate slate = useCase.handleWithBreakdown(UserId.of(effectiveId), k);
+            recs = slate.items();
+            breakdowns = slate.breakdowns();
+        } else {
+            recs = useCase.handle(UserId.of(effectiveId), k);
+            breakdowns = Map.of();
+        }
+
         List<RecommendationResponse> out = new ArrayList<>(recs.size());
         for (Recommendation r : recs) {
             Content content = contentRepository.findById(r.contentId()).orElse(null);
@@ -104,6 +121,14 @@ public class RecommendationController {
                             .findById(content.topicId())
                             .map(Topic::name)
                             .orElse("(unknown)");
+            RecommendationResponse.ScoreBreakdownDto dto = null;
+            if (admin) {
+                ScoreBreakdown b = breakdowns.get(r.contentId());
+                if (b != null) {
+                    dto = new RecommendationResponse.ScoreBreakdownDto(
+                            b.popularity(), b.cf(), b.cb(), b.blended());
+                }
+            }
             out.add(
                     new RecommendationResponse(
                             content.id().value(),
@@ -114,7 +139,8 @@ public class RecommendationController {
                             content.estMinutes(),
                             r.score().value(),
                             r.rankPosition(),
-                            r.reason().text()));
+                            r.reason().text(),
+                            dto));
         }
         return out;
     }

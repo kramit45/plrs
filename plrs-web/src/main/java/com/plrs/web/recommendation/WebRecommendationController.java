@@ -84,7 +84,7 @@ public class WebRecommendationController {
                             .map(Topic::name)
                             .orElse("(unknown)");
             out.add(
-                    new RecommendationResponse(
+                    RecommendationResponse.slim(
                             content.id().value(),
                             content.title(),
                             topicName,

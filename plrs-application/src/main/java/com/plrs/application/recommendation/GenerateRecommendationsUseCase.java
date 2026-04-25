@@ -92,4 +92,21 @@ public class GenerateRecommendationsUseCase {
         cacheStore.put(userId, new CachedTopN(currentVersion, recs, Instant.now(clock)));
         return recs;
     }
+
+    /**
+     * ADMIN-only path that returns the slate plus the per-content
+     * {@link ScoreBreakdown}. Always recomputes (no cache read or
+     * write) — breakdowns aren't persisted, and ADMIN debug calls
+     * shouldn't pollute or invalidate the per-user cache.
+     */
+    public RankedSlate handleWithBreakdown(UserId userId, int k) {
+        if (k < 1) {
+            throw new IllegalArgumentException("k must be >= 1, got " + k);
+        }
+        String variant =
+                interactionRepository.countPositivesForUser(userId) > 0L
+                        ? VARIANT_CF
+                        : VARIANT_POPULARITY;
+        return recommendationService.generateRankedSlate(userId, k, variant);
+    }
 }
