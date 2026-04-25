@@ -56,4 +56,23 @@ public interface InteractionJpaRepository
             nativeQuery = true)
     List<Object[]> countByIsoWeekSince(
             @Param("userId") UUID userId, @Param("since") Instant since);
+
+    /**
+     * Counts COMPLETE + LIKE events per content scoped to a candidate
+     * set and a since-instant. Returns only content that had at least
+     * one matching event; callers zero-fill missing candidates so an
+     * empty content set still produces a defensible 0 popularity.
+     */
+    @Query(
+            value =
+                    "SELECT content_id, COUNT(*)"
+                            + " FROM plrs_ops.interactions"
+                            + " WHERE event_type IN ('COMPLETE','LIKE')"
+                            + "   AND content_id IN (:contentIds)"
+                            + "   AND occurred_at >= :since"
+                            + " GROUP BY content_id",
+            nativeQuery = true)
+    List<Object[]> countByContentSince(
+            @Param("contentIds") java.util.Collection<Long> contentIds,
+            @Param("since") Instant since);
 }

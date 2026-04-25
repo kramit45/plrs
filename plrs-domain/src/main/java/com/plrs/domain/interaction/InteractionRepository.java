@@ -3,6 +3,7 @@ package com.plrs.domain.interaction;
 import com.plrs.domain.content.ContentId;
 import com.plrs.domain.user.UserId;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -51,4 +52,14 @@ public interface InteractionRepository {
      * the application service zero-fills missing weeks.
      */
     Map<String, Integer> countByIsoWeekSince(UserId userId, Instant since);
+
+    /**
+     * Counts {@code COMPLETE} + {@code LIKE} events per content, scoped
+     * to the given candidate set and to events with
+     * {@code occurredAt >= since}. Backs the FR-30 popularity fallback.
+     * The returned map only contains entries for content that had at
+     * least one matching event in the window — callers default missing
+     * candidates to zero.
+     */
+    Map<ContentId, Long> countByContentSince(Collection<ContentId> candidates, Instant since);
 }

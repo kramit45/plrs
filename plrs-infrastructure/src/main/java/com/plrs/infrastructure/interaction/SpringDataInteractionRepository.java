@@ -9,6 +9,8 @@ import com.plrs.domain.user.UserId;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +93,25 @@ public class SpringDataInteractionRepository implements InteractionRepository {
             String week = (String) row[0];
             Number n = (Number) row[1];
             out.put(week, n.intValue());
+        }
+        return out;
+    }
+
+    @Override
+    public Map<ContentId, Long> countByContentSince(
+            Collection<ContentId> candidates, Instant since) {
+        if (candidates == null || candidates.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = new ArrayList<>(candidates.size());
+        for (ContentId c : candidates) {
+            ids.add(c.value());
+        }
+        Map<ContentId, Long> out = new LinkedHashMap<>();
+        for (Object[] row : jpa.countByContentSince(ids, since)) {
+            Long contentId = ((Number) row[0]).longValue();
+            Long count = ((Number) row[1]).longValue();
+            out.put(ContentId.of(contentId), count);
         }
         return out;
     }
