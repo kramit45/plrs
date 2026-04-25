@@ -52,7 +52,14 @@ class UsersTableIT extends PostgresTestBase {
         Map<String, ColumnSpec> columns = loadColumns();
 
         assertThat(columns).containsOnlyKeys(
-                "id", "email", "password_hash", "created_at", "updated_at", "created_by");
+                "id",
+                "email",
+                "password_hash",
+                "created_at",
+                "updated_at",
+                "created_by",
+                // Added by V12 (step 88): user_skills_version powers cache busts.
+                "user_skills_version");
         assertThat(columns.get("id"))
                 .isEqualTo(new ColumnSpec("uuid", "NO", null));
         assertThat(columns.get("email"))
@@ -65,6 +72,8 @@ class UsersTableIT extends PostgresTestBase {
                 .isEqualTo(new ColumnSpec("timestamp with time zone", "NO", null));
         assertThat(columns.get("created_by"))
                 .isEqualTo(new ColumnSpec("character varying", "NO", 64));
+        assertThat(columns.get("user_skills_version"))
+                .isEqualTo(new ColumnSpec("bigint", "NO", null));
     }
 
     @Test
