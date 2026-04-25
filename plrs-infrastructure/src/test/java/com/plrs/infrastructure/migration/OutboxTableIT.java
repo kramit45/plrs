@@ -142,10 +142,14 @@ class OutboxTableIT extends PostgresTestBase {
 
     @Test
     void undeliveredQueryReturnsOnlyUndelivered() throws Exception {
+        // Tests share the container; filter on a unique aggregate_id prefix
+        // so rows from sibling tests in this class don't pollute the count.
+        String prefix = "und-" + java.util.UUID.randomUUID();
         try (Connection conn = dataSource.getConnection()) {
-            insertEvent(conn, "QUIZ", "a-1", "{\"v\":1}", null, (short) 0, null);
-            long delivered = insertEvent(conn, "QUIZ", "a-2", "{\"v\":2}", null, (short) 0, null);
-            insertEvent(conn, "QUIZ", "a-3", "{\"v\":3}", null, (short) 0, null);
+            insertEvent(conn, "QUIZ", prefix + "-1", "{\"v\":1}", null, (short) 0, null);
+            long delivered =
+                    insertEvent(conn, "QUIZ", prefix + "-2", "{\"v\":2}", null, (short) 0, null);
+            insertEvent(conn, "QUIZ", prefix + "-3", "{\"v\":3}", null, (short) 0, null);
 
             try (var ps = conn.prepareStatement(
                     "UPDATE plrs_ops.outbox_event SET delivered_at = ? WHERE outbox_id = ?")) {
@@ -155,11 +159,14 @@ class OutboxTableIT extends PostgresTestBase {
             }
 
             try (var ps = conn.prepareStatement(
-                            "SELECT COUNT(*) FROM plrs_ops.outbox_event WHERE delivered_at IS NULL"
-                                    + "  AND aggregate_type = 'QUIZ'");
-                    var rs = ps.executeQuery()) {
-                rs.next();
-                assertThat(rs.getInt(1)).isEqualTo(2);
+                    "SELECT COUNT(*) FROM plrs_ops.outbox_event"
+                            + " WHERE delivered_at IS NULL"
+                            + "   AND aggregate_id LIKE ?")) {
+                ps.setString(1, prefix + "-%");
+                try (var rs = ps.executeQuery()) {
+                    rs.next();
+                    assertThat(rs.getInt(1)).isEqualTo(2);
+                }
             }
         }
     }
