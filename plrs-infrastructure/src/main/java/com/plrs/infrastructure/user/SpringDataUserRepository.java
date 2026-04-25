@@ -77,4 +77,22 @@ public class SpringDataUserRepository implements UserRepository {
                 .setParameter("userId", userId.value())
                 .executeUpdate();
     }
+
+    /**
+     * Reads {@code users.user_skills_version}; returns 0 when the
+     * user row is absent so cache-version comparisons treat unknown
+     * users as a forced recompute rather than throwing.
+     */
+    @Override
+    public long getSkillsVersion(UserId userId) {
+        Object result =
+                em.createNativeQuery(
+                                "SELECT user_skills_version FROM plrs_ops.users"
+                                        + " WHERE id = :userId")
+                        .setParameter("userId", userId.value())
+                        .getResultStream()
+                        .findFirst()
+                        .orElse(null);
+        return result == null ? 0L : ((Number) result).longValue();
+    }
 }

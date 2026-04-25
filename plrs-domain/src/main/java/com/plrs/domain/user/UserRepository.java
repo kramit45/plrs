@@ -61,4 +61,14 @@ public interface UserRepository {
      * §3.b.5.3) guards against accidental decreases.
      */
     void bumpSkillsVersion(UserId userId);
+
+    /**
+     * Reads the current {@code users.user_skills_version} for the
+     * given user. Used by the recommender's cache layer to compare
+     * against the version stamped on a cached top-N entry (§2.e.2.3.3).
+     * Returns {@code 0} when the user is unknown — the caller will
+     * always treat the missing-cache case as a recompute, so this
+     * keeps the API total without requiring an Optional.
+     */
+    long getSkillsVersion(UserId userId);
 }
