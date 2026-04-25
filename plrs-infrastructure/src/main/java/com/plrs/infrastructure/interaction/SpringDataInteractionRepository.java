@@ -1,0 +1,67 @@
+package com.plrs.infrastructure.interaction;
+
+import com.plrs.domain.content.ContentId;
+import com.plrs.domain.interaction.InteractionEvent;
+import com.plrs.domain.interaction.InteractionRepository;
+import com.plrs.domain.interaction.Rating;
+import com.plrs.domain.user.UserId;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.time.Instant;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Adapter implementing {@link InteractionRepository} on top of Spring
+ * Data JPA. {@link #save(InteractionEvent)} uses
+ * {@link EntityManager#persist} (not {@code jpa.save()}) because Spring
+ * Data's {@code save()} calls {@code merge()} for composite-PK entities
+ * — that would silently update an existing row instead of raising the
+ * primary-key constraint violation the application expects on a
+ * concurrent retry. Persist always inserts; the composite PK fires on
+ * duplicates and the {@code @Repository} advice translates the resulting
+ * JPA exception into {@link org.springframework.dao.DataIntegrityViolationException}.
+ *
+ * <p>Not declared {@code final}: Spring Boot's observation / metrics
+ * {@code AbstractAdvisingBeanPostProcessor} CGLIB-subclasses every
+ * {@code @Component} bean. Same constraint as the other Spring Data
+ * adapters in this module.
+ *
+ * <p>Gated by {@code @ConditionalOnProperty("spring.datasource.url")} so
+ * the bean is not created when {@code PlrsApplicationTests} runs its
+ * no-DB smoke test.
+ *
+ * <p>Traces to: §3.a (adapter implements domain port), §3.c.1.4
+ * (interactions schema), FR-15 (VIEW debounce read).
+ */
+@Repository
+@ConditionalOnProperty(name = "spring.datasource.url")
+public class SpringDataInteractionRepository implements InteractionRepository {
+
+    private final InteractionJpaRepository jpa;
+
+    @PersistenceContext private EntityManager em;
+
+    public SpringDataInteractionRepository(InteractionJpaRepository jpa) {
+        this.jpa = jpa;
+    }
+
+    @Override
+    public void save(InteractionEvent event) {
+        InteractionJpaEntity entity =
+                new InteractionJpaEntity(
+                        event.userId().value(),
+                        event.contentId().value(),
+                        event.occurredAt(),
+                        event.eventType(),
+                        event.dwellSec().orElse(null),
+                        event.rating().map(Rating::value).orElse(null),
+                        event.clientInfo().orElse(null));
+        em.persist(entity);
+    }
+
+    @Override
+    public boolean existsViewSince(UserId userId, ContentId contentId, Instant since) {
+        return jpa.existsRecentView(userId.value(), contentId.value(), since);
+    }
+}
