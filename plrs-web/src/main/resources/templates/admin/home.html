@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <h1 class="h3 mb-4">Admin</h1>
+
+    <div class="row g-3">
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm" id="latest-eval-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Latest evaluation run</h2>
+
+                    <p class="text-muted small mb-3"
+                       th:if="${latestEval == null}"
+                       id="no-eval-yet">
+                        No evaluation has been run yet. Click below to compute the
+                        first set of metrics.
+                    </p>
+
+                    <dl class="row mb-3" th:if="${latestEval != null}"
+                        id="latest-eval-metrics">
+                        <dt class="col-sm-4">Ran at</dt>
+                        <dd class="col-sm-8" th:text="${latestEval.ranAt()}">-</dd>
+
+                        <dt class="col-sm-4">Variant</dt>
+                        <dd class="col-sm-8" th:text="${latestEval.variant()}">-</dd>
+
+                        <dt class="col-sm-4">k</dt>
+                        <dd class="col-sm-8" th:text="${latestEval.k()}">-</dd>
+
+                        <dt class="col-sm-4">precision@k</dt>
+                        <dd class="col-sm-8"
+                            th:text="${latestEval.precisionAtK() != null}
+                                     ? ${latestEval.precisionAtK()} : '—'">-</dd>
+
+                        <dt class="col-sm-4">nDCG@k</dt>
+                        <dd class="col-sm-8"
+                            th:text="${latestEval.ndcgAtK() != null}
+                                     ? ${latestEval.ndcgAtK()} : '—'">-</dd>
+
+                        <dt class="col-sm-4">coverage</dt>
+                        <dd class="col-sm-8"
+                            th:text="${latestEval.coverage() != null}
+                                     ? ${latestEval.coverage()} : '—'">-</dd>
+
+                        <dt class="col-sm-4">users evaluated</dt>
+                        <dd class="col-sm-8"
+                            th:text="${latestEval.nUsers() != null}
+                                     ? ${latestEval.nUsers()} : '—'">-</dd>
+                    </dl>
+
+                    <form th:action="@{/admin/eval/run}" method="post">
+                        <button type="submit" class="btn btn-primary"
+                                id="run-eval-button">
+                            Run new evaluation
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
