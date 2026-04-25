@@ -12,6 +12,7 @@ import com.plrs.domain.content.ContentType;
 import com.plrs.domain.content.Difficulty;
 import com.plrs.domain.content.PrerequisiteEdge;
 import com.plrs.domain.content.PrerequisiteRepository;
+import com.plrs.domain.content.SearchPage;
 import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
 import jakarta.validation.Valid;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -111,6 +113,37 @@ public class ContentController {
         List<PrerequisiteEdge> prereqs = prereqRepository.findDirectPrerequisitesOf(c.id());
         List<PrerequisiteEdge> dependents = prereqRepository.findDirectDependentsOf(c.id());
         return ContentDetailResponse.from(c, prereqs, dependents);
+    }
+
+    /**
+     * Paginated keyword search over title, description, and tags (FR-13).
+     *
+     * <p>{@code pageSize} is clamped to {@code [1, 100]} and
+     * {@code pageNumber} to {@code >= 0} — the endpoint never 400s on
+     * pagination inputs, just normalises them. A blank or null
+     * {@code q} returns an empty page without issuing SQL.
+     *
+     * <p>Open to any authenticated user; no role gate (per FR-13:
+     * browsing the catalogue is the default capability).
+     */
+    @GetMapping("/search")
+    public ContentSearchResponse search(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "0") int pageNumber) {
+        int effectivePageSize = Math.max(1, Math.min(pageSize, 100));
+        int effectivePageNumber = Math.max(0, pageNumber);
+        String query = q == null ? "" : q.trim();
+        SearchPage page =
+                contentRepository.search(query, effectivePageSize, effectivePageNumber);
+        List<ContentSummary> items =
+                page.items().stream().map(ContentSummary::from).toList();
+        return new ContentSearchResponse(
+                items,
+                page.pageNumber(),
+                page.pageSize(),
+                page.totalElements(),
+                page.totalPages());
     }
 
     @PostMapping("/{id}/prerequisites")
