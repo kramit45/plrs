@@ -2,12 +2,14 @@ package com.plrs.infrastructure.recommendation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.plrs.application.eval.EvalReport;
 import com.plrs.application.recommendation.MlServiceClient;
 import com.plrs.application.recommendation.MlServiceException;
 import com.plrs.application.recommendation.RebuildResult;
 import com.plrs.application.recommendation.SimNeighbour;
 import com.plrs.domain.content.ContentId;
 import java.io.IOException;
+import java.time.Instant;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -101,6 +103,14 @@ public class HttpMlServiceClient implements MlServiceClient {
         HttpResponse<String> response =
                 sendWithRetry("POST", "/cf/recompute", "", new byte[0]);
         return parseRebuildResult(response.body());
+    }
+
+    @Override
+    public EvalReport runEval(String variant, int k) {
+        String query = "?variant=" + variant + "&k=" + k;
+        HttpResponse<String> response =
+                sendWithRetry("POST", "/eval/run", query, new byte[0]);
+        return parseEvalReport(response.body());
     }
 
     @Override
@@ -243,6 +253,36 @@ public class HttpMlServiceClient implements MlServiceClient {
         } catch (Exception e) {
             throw new MlServiceException("malformed rebuild result payload", e);
         }
+    }
+
+    private EvalReport parseEvalReport(String body) {
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            String status = root.path("status").asText("OK");
+            String variant = root.path("variant").asText("");
+            int k = root.path("k").asInt(0);
+            String ranAtRaw = root.path("ran_at").asText("");
+            Instant ranAt = ranAtRaw.isEmpty() ? Instant.now() : Instant.parse(ranAtRaw);
+            return new EvalReport(
+                    status,
+                    variant,
+                    k,
+                    optDouble(root, "precision_at_k"),
+                    optDouble(root, "ndcg_at_k"),
+                    optDouble(root, "coverage"),
+                    optInt(root, "n_users"),
+                    ranAt,
+                    optString(root, "reason"));
+        } catch (Exception e) {
+            throw new MlServiceException("malformed eval report payload", e);
+        }
+    }
+
+    private static Optional<Double> optDouble(JsonNode root, String key) {
+        JsonNode node = root.path(key);
+        return node.isMissingNode() || node.isNull()
+                ? Optional.empty()
+                : Optional.of(node.asDouble());
     }
 
     private static Optional<Integer> optInt(JsonNode root, String key) {

@@ -1,5 +1,6 @@
 package com.plrs.application.recommendation;
 
+import com.plrs.application.eval.EvalReport;
 import com.plrs.domain.content.ContentId;
 import java.util.List;
 
@@ -30,6 +31,9 @@ public interface MlServiceClient {
 
     /** Triggers the item-item CF recompute on the ML side. */
     RebuildResult recomputeCf();
+
+    /** Runs the offline evaluation harness and returns the metrics report. */
+    EvalReport runEval(String variant, int k);
 
     /** Cheap liveness probe — true iff {@code GET /health} returns 200. */
     boolean isReachable();
