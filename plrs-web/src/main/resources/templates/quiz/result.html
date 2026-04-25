@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <p class="mb-3">
+        <a th:href="@{/catalog/{id}(id=${quiz.contentId()})}" class="link-secondary">
+            &larr; Back to content
+        </a>
+    </p>
+
+    <h1 class="h3 mb-1" th:text="${quiz.title()}">Quiz</h1>
+    <h2 class="h5 text-muted mb-4">
+        You scored <span th:text="${result.correctCount()}">0</span>
+        out of <span th:text="${result.totalCount()}">0</span>
+        (<span th:text="${result.score()}">0.00</span>%)
+    </h2>
+
+    <div class="list-group">
+        <div class="list-group-item" th:each="fb : ${resolvedFeedback}">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+                <h6 class="mb-0">
+                    <span th:text="${fb.itemOrder()}">1</span>.
+                    <span th:text="${fb.stem()}">Stem</span>
+                </h6>
+                <span class="badge"
+                      th:classappend="${fb.isCorrect()} ? 'bg-success' : 'bg-danger'"
+                      th:text="${fb.isCorrect()} ? 'Correct' : 'Incorrect'">badge</span>
+            </div>
+            <p class="mb-1 small">
+                Your answer: <span th:text="${fb.selectedText()}">x</span>
+            </p>
+            <p class="mb-0 small text-muted" th:unless="${fb.isCorrect()}">
+                Correct answer: <span th:text="${fb.correctText()}">y</span>
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>
