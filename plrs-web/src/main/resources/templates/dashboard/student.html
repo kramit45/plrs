@@ -53,6 +53,18 @@
         </div>
 
         <div class="col-12">
+            <div class="card shadow-sm" id="weekly-activity-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Weekly activity (last 8 weeks)</h2>
+                    <canvas id="weeklyActivityChart"
+                            data-endpoint="/web-api/me/activity-weekly"
+                            height="80">
+                    </canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
             <div class="card shadow-sm" id="recent-attempts-card">
                 <div class="card-body">
                     <h2 class="h5 card-title">Recent quiz attempts</h2>

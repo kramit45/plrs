@@ -4,6 +4,7 @@ import com.plrs.domain.content.ContentId;
 import com.plrs.domain.user.UserId;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Domain port for the implicit-feedback event stream. The adapter (step
@@ -42,4 +43,12 @@ public interface InteractionRepository {
      * Backs the FR-35 dashboard "recent completions" card.
      */
     List<InteractionEvent> findRecentCompletes(UserId userId, int limit);
+
+    /**
+     * Returns interaction counts grouped by ISO year-week (e.g.
+     * {@code "2026-17"}) for events whose {@code occurredAt} is at or
+     * after {@code since}. Backs the FR-35 weekly activity sparkline;
+     * the application service zero-fills missing weeks.
+     */
+    Map<String, Integer> countByIsoWeekSince(UserId userId, Instant since);
 }

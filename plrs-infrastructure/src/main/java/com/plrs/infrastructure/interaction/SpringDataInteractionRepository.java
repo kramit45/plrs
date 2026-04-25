@@ -9,7 +9,9 @@ import com.plrs.domain.user.UserId;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
@@ -80,6 +82,17 @@ public class SpringDataInteractionRepository implements InteractionRepository {
         return jpa.findRecentCompletes(userId.value(), PageRequest.of(0, limit)).stream()
                 .map(SpringDataInteractionRepository::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Map<String, Integer> countByIsoWeekSince(UserId userId, Instant since) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (Object[] row : jpa.countByIsoWeekSince(userId.value(), since)) {
+            String week = (String) row[0];
+            Number n = (Number) row[1];
+            out.put(week, n.intValue());
+        }
+        return out;
     }
 
     private static InteractionEvent toDomain(InteractionJpaEntity e) {

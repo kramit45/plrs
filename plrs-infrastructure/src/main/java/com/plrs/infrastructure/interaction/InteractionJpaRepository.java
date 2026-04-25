@@ -36,4 +36,24 @@ public interface InteractionJpaRepository
                     + " ORDER BY i.occurredAt DESC")
     List<InteractionJpaEntity> findRecentCompletes(
             @Param("userId") UUID userId, Pageable pageable);
+
+    /**
+     * Counts interactions for {@code userId} since {@code since}, grouped
+     * by ISO year-week. Native query: Postgres' {@code IYYY} is the ISO
+     * 8601 year (week-based) and {@code IW} is the ISO week number
+     * (01..53). The pair forms a stable, sortable key the application
+     * layer can compare directly to its own zero-fill sequence.
+     */
+    @Query(
+            value =
+                    "SELECT to_char(occurred_at, 'IYYY-IW') AS iso_week,"
+                            + " COUNT(*) AS n"
+                            + " FROM plrs_ops.interactions"
+                            + " WHERE user_id = :userId"
+                            + "   AND occurred_at >= :since"
+                            + " GROUP BY iso_week"
+                            + " ORDER BY iso_week ASC",
+            nativeQuery = true)
+    List<Object[]> countByIsoWeekSince(
+            @Param("userId") UUID userId, @Param("since") Instant since);
 }
