@@ -1,0 +1,60 @@
+// Builds the Chart.js radar for the student dashboard. Loaded as a
+// static asset so the page complies with the Iter 1 CSP that forbids
+// inline scripts. Chart data is supplied via JSON-encoded data-*
+// attributes on the <canvas> element so the template never embeds
+// JavaScript expressions.
+(function () {
+    'use strict';
+
+    function readJsonAttr(el, name, fallback) {
+        var raw = el.getAttribute(name);
+        if (raw === null || raw === '') {
+            return fallback;
+        }
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            console.warn('dashboard-charts: bad JSON in ' + name, e);
+            return fallback;
+        }
+    }
+
+    function initRadar() {
+        var canvas = document.getElementById('masteryRadar');
+        if (!canvas || typeof Chart === 'undefined') {
+            return;
+        }
+        var labels = readJsonAttr(canvas, 'data-labels', []);
+        var values = readJsonAttr(canvas, 'data-values', []);
+        new Chart(canvas, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Mastery',
+                        data: values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        pointBackgroundColor: 'rgba(54, 162, 235, 1)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    r: {
+                        suggestedMin: 0,
+                        suggestedMax: 1
+                    }
+                }
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initRadar);
+    } else {
+        initRadar();
+    }
+})();

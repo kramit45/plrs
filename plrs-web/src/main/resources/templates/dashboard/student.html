@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <h1 class="h3 mb-4">Your dashboard</h1>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100" id="mastery-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Mastery by topic</h2>
+                    <p class="text-muted small mb-3"
+                       th:if="${dashboard.top6Mastery().isEmpty()}">
+                        No mastery data yet. Take a quiz to start populating this chart.
+                    </p>
+                    <canvas id="masteryRadar"
+                            th:attr="data-labels=${masteryLabelsJson},
+                                     data-values=${masteryValuesJson}"
+                            height="260">
+                    </canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100" id="recent-completes-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Recent completions</h2>
+                    <p class="text-muted small mb-2"
+                       th:if="${dashboard.recentCompletes().isEmpty()}">
+                        Nothing completed yet.
+                    </p>
+                    <table class="table table-sm mb-0"
+                           th:if="${!dashboard.recentCompletes().isEmpty()}">
+                        <thead>
+                        <tr>
+                            <th scope="col">Title</th>
+                            <th scope="col">Completed at</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="c : ${dashboard.recentCompletes()}">
+                            <td th:text="${c.title()}">title</td>
+                            <td th:text="${#temporals.format(c.completedAt(), 'yyyy-MM-dd HH:mm')}">
+                                ts
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card shadow-sm" id="recent-attempts-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Recent quiz attempts</h2>
+                    <p class="text-muted small mb-2"
+                       th:if="${dashboard.recentAttempts().isEmpty()}">
+                        No quiz attempts yet.
+                    </p>
+                    <table class="table table-sm mb-0"
+                           th:if="${!dashboard.recentAttempts().isEmpty()}">
+                        <thead>
+                        <tr>
+                            <th scope="col">Quiz</th>
+                            <th scope="col">Score</th>
+                            <th scope="col">Attempted at</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="a : ${dashboard.recentAttempts()}">
+                            <td th:text="${a.quizTitle()}">quiz</td>
+                            <td th:text="${a.score()}">score</td>
+                            <td th:text="${#temporals.format(a.attemptedAt(), 'yyyy-MM-dd HH:mm')}">
+                                ts
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/dashboard-charts.js}"></script>
+</div>
+</body>
+</html>
