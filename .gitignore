@@ -3,6 +3,9 @@ target/
 *.class
 dependency-reduced-pom.xml
 
+# jqwik property-based tests local cache
+.jqwik-database
+
 # IDEs
 .idea/
 *.iml
