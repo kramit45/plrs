@@ -17,9 +17,12 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -175,6 +178,21 @@ public class GlobalExceptionHandler {
                 "authentication-required",
                 "Unauthorized",
                 "Authentication is required to access this resource");
+    }
+
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<ProblemDetail> handleRateLimited(RateLimitedException e) {
+        ProblemDetail body =
+                problem(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        "rate-limited",
+                        "Too Many Requests",
+                        "You are issuing requests too quickly; try again later.");
+        body.setProperty("retryAfterSeconds", e.retryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.retryAfterSeconds()))
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(body);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
