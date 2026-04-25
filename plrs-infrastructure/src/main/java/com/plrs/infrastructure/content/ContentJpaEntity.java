@@ -3,6 +3,7 @@ package com.plrs.infrastructure.content;
 import com.plrs.domain.content.ContentType;
 import com.plrs.domain.content.Difficulty;
 import com.plrs.infrastructure.user.AuditFieldsEmbeddable;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -94,7 +95,11 @@ public class ContentJpaEntity {
     @Column(name = "tag", nullable = false, length = 60)
     private Set<String> tags = new HashSet<>();
 
-    @Embedded private AuditFieldsEmbeddable audit;
+    @Embedded
+    @AttributeOverride(
+            name = "createdBy",
+            column = @Column(name = "audit_created_by", nullable = false, length = 64))
+    private AuditFieldsEmbeddable audit;
 
     public ContentJpaEntity(
             Long id,

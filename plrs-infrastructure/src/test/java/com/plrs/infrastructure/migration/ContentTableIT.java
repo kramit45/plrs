@@ -65,7 +65,10 @@ class ContentTableIT extends PostgresTestBase {
                         "description",
                         "created_at",
                         "created_by",
-                        "updated_at");
+                        "updated_at",
+                        "audit_created_by");
+        assertThat(columns.get("audit_created_by"))
+                .isEqualTo(new ColumnSpec("character varying", "NO", 64));
         assertThat(columns.get("content_id"))
                 .isEqualTo(new ColumnSpec("bigint", "NO", null));
         assertThat(columns.get("topic_id"))
