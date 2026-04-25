@@ -4,9 +4,13 @@ import com.plrs.domain.user.Email;
 import com.plrs.domain.user.User;
 import com.plrs.domain.user.UserId;
 import com.plrs.domain.user.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Adapter implementing the domain-owned
@@ -14,15 +18,12 @@ import org.springframework.stereotype.Repository;
  * JPA. Delegates every method to {@link UserJpaRepository} and converts
  * between the domain aggregate and the JPA entity via {@link UserMapper}.
  *
- * <p>Database uniqueness violations (duplicate email races past the
- * application-layer existence check) surface here as
- * {@link org.springframework.dao.DataIntegrityViolationException}. Those
- * are deliberately left unwrapped at this layer: the use case in step 34
- * catches them and maps to a domain-level outcome. Keeping the adapter
- * thin — pure translation, no policy — means every bit of business
- * behaviour stays testable in isolation at the service layer.
+ * <p>{@link #bumpSkillsVersion} runs a single native UPDATE inside the
+ * caller's transaction (PROPAGATION.MANDATORY). The DB-side TRG-3
+ * trigger (§3.b.5.3) ensures the column is monotonic.
  *
- * <p>Traces to: §3.a (adapter implements domain port), §3.c (users persistence).
+ * <p>Traces to: §3.a (adapter implements domain port), §3.c (users persistence),
+ * §2.e.2.4.2 (TX-01 version bump).
  */
 @Repository
 @ConditionalOnProperty(name = "spring.datasource.url")
@@ -30,6 +31,8 @@ public class SpringDataUserRepository implements UserRepository {
 
     private final UserJpaRepository jpa;
     private final UserMapper mapper;
+
+    @PersistenceContext private EntityManager em;
 
     public SpringDataUserRepository(UserJpaRepository jpa, UserMapper mapper) {
         this.jpa = jpa;
@@ -55,5 +58,23 @@ public class SpringDataUserRepository implements UserRepository {
     public User save(User user) {
         UserJpaEntity saved = jpa.save(mapper.toEntity(user));
         return mapper.toDomain(saved);
+    }
+
+    /**
+     * Atomically bumps {@code users.user_skills_version} by 1. Must run
+     * inside an existing transaction (mandated via
+     * {@link Propagation#MANDATORY}); the calling use case
+     * (SubmitQuizAttempt, step 90) is already {@code @Transactional}.
+     * TRG-3 (§3.b.5.3) on the {@code users} table back-stops monotonicity.
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void bumpSkillsVersion(UserId userId) {
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users"
+                                + " SET user_skills_version = user_skills_version + 1"
+                                + " WHERE id = :userId")
+                .setParameter("userId", userId.value())
+                .executeUpdate();
     }
 }

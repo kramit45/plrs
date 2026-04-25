@@ -52,4 +52,13 @@ public interface UserRepository {
      * layer is responsible for stamping them before calling save.
      */
     User save(User user);
+
+    /**
+     * Atomically increments {@code users.user_skills_version} by 1 for
+     * the given user. Used by SubmitQuizAttempt (step 90) to flip a
+     * cache-bust signal in the same transaction as the mastery upsert
+     * (TX-01, §2.e.2.4.2). The DB-level monotonic trigger (TRG-3,
+     * §3.b.5.3) guards against accidental decreases.
+     */
+    void bumpSkillsVersion(UserId userId);
 }

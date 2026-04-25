@@ -34,9 +34,9 @@ public abstract class PostgresTestBase {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         // Spring caches one ApplicationContext per IT class; with default
-        // Hikari pool (10) and ~11 ITs in the module, the cumulative pool
+        // Hikari pool (10) and ~17+ ITs in the module, the cumulative pool
         // can blow past Postgres's default max_connections=100. Cap the
         // per-context pool small — each IT only ever uses a few connections.
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "3");
     }
 }
