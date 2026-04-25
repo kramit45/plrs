@@ -169,7 +169,8 @@ class TfIdfBuildJobIT {
                                             .REGEX,
                             pattern = "com\\.plrs\\.infrastructure\\.recommendation\\."
                                     + "(SpringDataRecommendation|RedisCfScorer|"
-                                    + "RedisTopNCacheStore|ItemSimilarityJob|"
+                                    + "RedisCbScorer|RedisTopNCacheStore|"
+                                    + "ItemSimilarityJob|"
                                     + "CfGoldenIT.*|ItemSimilarityJobIT.*|"
                                     + "SpringDataArtifactRepositoryIT.*|"
                                     + "SpringDataRecommendationRepositoryIT.*)"))

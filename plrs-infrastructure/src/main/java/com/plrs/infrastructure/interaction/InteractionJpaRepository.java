@@ -109,4 +109,19 @@ public interface InteractionJpaRepository
                     + "         AND i.rating >= 4)"
                     + "   )")
     long countPositivesForUser(@Param("userId") UUID userId);
+
+    /**
+     * Most-recent-first stream of the user's events of one type with
+     * occurredAt &gt;= since. Backs CbScorer (step 118).
+     */
+    @Query(
+            "SELECT i FROM InteractionJpaEntity i"
+                    + " WHERE i.userId = :userId"
+                    + "   AND i.eventType = :eventType"
+                    + "   AND i.occurredAt >= :since"
+                    + " ORDER BY i.occurredAt DESC")
+    List<InteractionJpaEntity> findRecentByEventType(
+            @Param("userId") UUID userId,
+            @Param("eventType") com.plrs.domain.interaction.EventType eventType,
+            @Param("since") Instant since);
 }

@@ -81,4 +81,12 @@ public interface InteractionRepository {
      * {@code RATE} with {@code rating >= 4}.
      */
     long countPositivesForUser(UserId userId);
+
+    /**
+     * Returns the user's most-recent events of the given type within
+     * the last {@code days} days. Backs the CbScorer (step 118),
+     * which builds an interest centroid from the user's recently
+     * completed items.
+     */
+    List<InteractionEvent> findRecentByEventType(UserId userId, EventType eventType, int days);
 }

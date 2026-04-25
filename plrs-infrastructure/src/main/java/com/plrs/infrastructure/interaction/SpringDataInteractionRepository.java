@@ -143,6 +143,60 @@ public class SpringDataInteractionRepository implements InteractionRepository {
     }
 
     @Override
+    public List<InteractionEvent> findRecentByEventType(
+            UserId userId, EventType eventType, int days) {
+        if (days < 0) {
+            throw new IllegalArgumentException("days must be >= 0, got " + days);
+        }
+        Instant since =
+                Instant.now(java.time.Clock.systemUTC())
+                        .minus(java.time.Duration.ofDays(days));
+        return jpa.findRecentByEventType(userId.value(), eventType, since).stream()
+                .map(SpringDataInteractionRepository::toDomainOfType)
+                .toList();
+    }
+
+    private static InteractionEvent toDomainOfType(InteractionJpaEntity e) {
+        switch (e.getEventType()) {
+            case VIEW:
+                return InteractionEvent.view(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Optional.ofNullable(e.getDwellSec()),
+                        Optional.ofNullable(e.getClientInfo()));
+            case COMPLETE:
+                return InteractionEvent.complete(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Optional.ofNullable(e.getDwellSec()),
+                        Optional.ofNullable(e.getClientInfo()));
+            case BOOKMARK:
+                return InteractionEvent.bookmark(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Optional.ofNullable(e.getClientInfo()));
+            case LIKE:
+                return InteractionEvent.like(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Optional.ofNullable(e.getClientInfo()));
+            case RATE:
+                return InteractionEvent.rate(
+                        UserId.of(e.getUserId()),
+                        ContentId.of(e.getContentId()),
+                        e.getOccurredAt(),
+                        Rating.of(e.getRating()),
+                        Optional.ofNullable(e.getClientInfo()));
+            default:
+                throw new IllegalStateException("unknown event type: " + e.getEventType());
+        }
+    }
+
+    @Override
     public Map<String, Integer> countByIsoWeekSince(UserId userId, Instant since) {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Object[] row : jpa.countByIsoWeekSince(userId.value(), since)) {

@@ -90,6 +90,79 @@ public class TfIdfReader {
         snapshotRef.set(Snapshot.EMPTY);
     }
 
+    /**
+     * Returns the L2-normalised centroid (mean) of the rows for the
+     * given content ids as a dense {@code double[]} of length
+     * {@code vocabSize}. Unknown ids contribute nothing. An all-zero
+     * input returns an all-zero vector. The CbScorer (step 118) hands
+     * this to {@link #cosineWith(ContentId, double[])} for each
+     * candidate.
+     */
+    public double[] centroid(java.util.Set<ContentId> contentIds) {
+        Snapshot s = ensureLoaded();
+        int vocabSize = s.vocabSize();
+        double[] sum = new double[vocabSize];
+        int contributed = 0;
+        if (contentIds == null) {
+            return sum;
+        }
+        for (ContentId id : contentIds) {
+            List<TermWeight> row = s.rows().get(id.value());
+            if (row == null) {
+                continue;
+            }
+            for (TermWeight tw : row) {
+                if (tw.idx() < vocabSize) {
+                    sum[tw.idx()] += tw.weight();
+                }
+            }
+            contributed++;
+        }
+        if (contributed == 0) {
+            return sum; // all zeros
+        }
+        // Mean.
+        for (int i = 0; i < vocabSize; i++) {
+            sum[i] /= contributed;
+        }
+        // L2-normalise so cosine = dot product downstream.
+        double norm = 0.0;
+        for (double v : sum) {
+            norm += v * v;
+        }
+        if (norm <= 0.0) {
+            return sum;
+        }
+        norm = Math.sqrt(norm);
+        for (int i = 0; i < vocabSize; i++) {
+            sum[i] /= norm;
+        }
+        return sum;
+    }
+
+    /**
+     * Cosine similarity between {@code candidate}'s row and a dense
+     * vector (typically a centroid). Returns 0 when the candidate has
+     * no row or {@code other} is all zeros. Clamped to {@code [0, 1]}
+     * defensively against floating-point drift.
+     */
+    public double cosineWith(ContentId candidate, double[] other) {
+        if (other == null || other.length == 0) {
+            return 0.0;
+        }
+        List<TermWeight> row = getRow(candidate);
+        if (row.isEmpty()) {
+            return 0.0;
+        }
+        double sum = 0.0;
+        for (TermWeight tw : row) {
+            if (tw.idx() < other.length) {
+                sum += tw.weight() * other[tw.idx()];
+            }
+        }
+        return Math.max(0.0, Math.min(1.0, sum));
+    }
+
     private Snapshot ensureLoaded() {
         Snapshot current = snapshotRef.get();
         if (current.loaded) {
@@ -109,7 +182,7 @@ public class TfIdfReader {
                 Optional<ArtifactPayload> backup =
                         artifactRepository.find("TFIDF", "matrix");
                 if (backup.isEmpty()) {
-                    return new Snapshot(true, Map.of());
+                    return new Snapshot(true, 0, Map.of());
                 }
                 json = backup.get().asString();
                 // Warm Redis so the next read is hot.
@@ -120,6 +193,8 @@ public class TfIdfReader {
                 }
             }
             Map<String, Object> root = objectMapper.readValue(json, ROOT_TYPE);
+            List<?> vocab = (List<?>) root.getOrDefault("vocab", List.of());
+            int vocabSize = vocab.size();
             List<Map<String, Object>> rawRows =
                     (List<Map<String, Object>>) root.getOrDefault("rows", List.of());
             Map<Long, List<TermWeight>> rows = new HashMap<>(rawRows.size());
@@ -132,13 +207,16 @@ public class TfIdfReader {
                     int idx = ((Number) tw.get("idx")).intValue();
                     double weight = ((Number) tw.get("weight")).doubleValue();
                     terms.add(new TermWeight(idx, weight));
+                    if (idx + 1 > vocabSize) {
+                        vocabSize = idx + 1;
+                    }
                 }
                 rows.put(contentId, terms);
             }
-            return new Snapshot(true, rows);
+            return new Snapshot(true, vocabSize, rows);
         } catch (Exception e) {
             log.warn("TfIdfReader: load failed", e);
-            return new Snapshot(true, Map.of());
+            return new Snapshot(true, 0, Map.of());
         }
     }
 
@@ -162,7 +240,8 @@ public class TfIdfReader {
         return sum;
     }
 
-    private record Snapshot(boolean loaded, Map<Long, List<TermWeight>> rows) {
-        static final Snapshot EMPTY = new Snapshot(false, Map.of());
+    private record Snapshot(
+            boolean loaded, int vocabSize, Map<Long, List<TermWeight>> rows) {
+        static final Snapshot EMPTY = new Snapshot(false, 0, Map.of());
     }
 }
