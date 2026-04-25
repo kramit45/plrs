@@ -50,3 +50,7 @@ plrs:
       fixed-delay-ms: 5000
       initial-delay-ms: 5000
       batch-size: 25
+  ml:
+    base-url: ${PLRS_ML_URL:http://localhost:8000}
+    hmac-secret: ${PLRS_ML_HMAC_SECRET:dev-secret}
+    timeout-seconds: 2
