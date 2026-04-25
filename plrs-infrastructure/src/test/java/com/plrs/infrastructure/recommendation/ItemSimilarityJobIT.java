@@ -251,7 +251,8 @@ class ItemSimilarityJobIT {
                                     org.springframework.context.annotation.FilterType
                                             .REGEX,
                             pattern = "com\\.plrs\\.infrastructure\\.recommendation\\.SpringData.*|"
-                                    + "com\\.plrs\\.infrastructure\\.recommendation\\.Redis.*"))
+                                    + "com\\.plrs\\.infrastructure\\.recommendation\\.Redis.*|"
+                                    + "com\\.plrs\\.infrastructure\\.recommendation\\.CfGoldenIT.*"))
     static class SimJobITApp {
 
         @org.springframework.context.annotation.Bean
