@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <p class="mb-3">
+        <a th:href="@{/catalog}" class="link-secondary">&larr; Back to catalogue</a>
+    </p>
+
+    <h1 class="h3 mb-1" th:text="${item.title()}">Title</h1>
+    <p class="text-muted mb-3" th:if="${topic != null}">
+        Topic: <span th:text="${topic.name()}">topic</span>
+    </p>
+
+    <p class="mb-3">
+        <span class="badge bg-info text-dark me-2" th:text="${item.ctype().name()}">VIDEO</span>
+        <span class="badge bg-warning text-dark me-2"
+              th:text="${item.difficulty().name()}">BEGINNER</span>
+        <span class="badge bg-secondary"
+              th:text="|${item.estMinutes()} min|">10 min</span>
+    </p>
+
+    <div th:if="${item.description().isPresent()}" class="mb-3">
+        <p th:text="${item.description().get()}">description</p>
+    </div>
+
+    <div class="mb-3" th:unless="${item.tags().isEmpty()}">
+        <span class="badge rounded-pill bg-light text-dark border me-1"
+              th:each="tag : ${item.tags()}"
+              th:text="${tag}">tag</span>
+    </div>
+
+    <p class="mb-4">
+        <a th:href="${item.url()}" target="_blank" rel="noopener"
+           class="btn btn-primary">Open content</a>
+    </p>
+
+    <section class="mb-4">
+        <h2 class="h5">Prerequisites</h2>
+        <ul class="list-group" th:unless="${prereqs.isEmpty()}">
+            <li class="list-group-item" th:each="edge : ${prereqs}">
+                <a th:href="@{/catalog/{id}(id=${edge.prereqContentId().value()})}"
+                   th:text="${titlesById[edge.prereqContentId()]} ?: 'unknown'">
+                    prereq title
+                </a>
+            </li>
+        </ul>
+        <p class="text-muted" th:if="${prereqs.isEmpty()}">No prerequisites.</p>
+    </section>
+
+    <section class="mb-4">
+        <h2 class="h5">This is a prerequisite for</h2>
+        <ul class="list-group" th:unless="${dependents.isEmpty()}">
+            <li class="list-group-item" th:each="edge : ${dependents}">
+                <a th:href="@{/catalog/{id}(id=${edge.contentId().value()})}"
+                   th:text="${titlesById[edge.contentId()]} ?: 'unknown'">
+                    dependent title
+                </a>
+            </li>
+        </ul>
+        <p class="text-muted" th:if="${dependents.isEmpty()}">
+            Nothing depends on this content yet.
+        </p>
+    </section>
+
+    <section th:if="${isStudent}" class="card">
+        <div class="card-body">
+            <h3 class="h6 card-title">Your interactions</h3>
+            <p class="card-text mb-1 text-muted">
+                Your interactions will appear here once you view this content.
+            </p>
+            <p class="card-text small text-muted mb-0">(wiring: step 72)</p>
+        </div>
+    </section>
+</div>
+</body>
+</html>

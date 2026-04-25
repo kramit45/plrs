@@ -46,6 +46,7 @@ class CatalogViewControllerTest {
 
     @MockBean private ContentRepository contentRepository;
     @MockBean private TopicRepository topicRepository;
+    @MockBean private com.plrs.domain.content.PrerequisiteRepository prereqRepository;
     @MockBean private TokenService tokenService;
 
     private static Content sample(long id, String title) {
