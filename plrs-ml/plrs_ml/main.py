@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 
 from . import __version__
+from .cf import recompute_cf
 from .features import rebuild_tfidf
 
 app = FastAPI(title="PLRS ML", version=__version__)
@@ -21,3 +22,8 @@ async def health() -> dict[str, str]:
 @app.post("/features/rebuild")
 async def features_rebuild() -> dict:
     return rebuild_tfidf()
+
+
+@app.post("/cf/recompute")
+async def cf_recompute() -> dict:
+    return recompute_cf()
