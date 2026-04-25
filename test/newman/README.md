@@ -1,4 +1,26 @@
-# PLRS Iter 1 — Newman API E2E
+# PLRS — Newman API E2E
+
+This directory ships two collections:
+
+- **`plrs-iter1.*`** — original Iter 1 register/login/me/logout flow
+  (covered below).
+- **`plrs-iter2.*`** — Iter 2 catalogue + interaction + quiz flow.
+  Requires `seed.sql` to be loaded first (creates a known
+  `INSTRUCTOR` user and a seeded demo quiz). Run via
+  `./run-iter2.sh` / `.\run-iter2.ps1`. Loading the seed:
+
+  ```bash
+  psql "$DB_URL" -f test/newman/seed.sql
+  # or against a containerised DB:
+  docker compose exec -T db psql -U plrs -d plrs < test/newman/seed.sql
+  ```
+
+  Iter 2 deviation: the spec mentions
+  `GET /web-api/me/activity-weekly` — that endpoint lives on the
+  session-cookie web chain (not the JWT API chain), so it is exercised
+  by the Playwright E2E in step 99 rather than Newman.
+
+## Iter 1 — register → login → me → logout
 
 Five-request Postman collection that exercises the full Iter 1 JSON API flow:
 

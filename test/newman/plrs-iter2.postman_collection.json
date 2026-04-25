@@ -1,0 +1,320 @@
+{
+  "info": {
+    "name": "PLRS Iter2 E2E",
+    "description": "Instructor authoring -> student interaction -> quiz attempt. Requires test/newman/seed.sql to be loaded first (creates a known INSTRUCTOR user and a seeded demo quiz). Traces to: §3.e (E2E), FR-08/13/15/20.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Instructor login (seeded)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Roles include INSTRUCTOR', () => pm.expect(body.roles).to.include('INSTRUCTOR'));",
+              "pm.environment.set('instructorAccessToken', body.accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{instructorEmail}}\",\n  \"password\": \"{{instructorPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Instructor creates a topic",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.environment.set('newTopicName', `Newman Topic ${Date.now()}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('Body has topicId', () => pm.expect(body.topicId).to.be.a('number'));",
+              "pm.environment.set('newTopicId', body.topicId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{instructorAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{newTopicName}}\",\n  \"description\": \"Created by Iter 2 Newman E2E\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/topics",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "topics"]
+        }
+      }
+    },
+    {
+      "name": "Instructor creates VIDEO content under that topic",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.environment.set('newContentTitle', `Newman Video ${Date.now()}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('Body has contentId', () => pm.expect(body.contentId).to.be.a('number'));",
+              "pm.environment.set('newVideoContentId', body.contentId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{instructorAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"topicId\": {{newTopicId}},\n  \"title\": \"{{newContentTitle}}\",\n  \"ctype\": \"VIDEO\",\n  \"difficulty\": \"BEGINNER\",\n  \"estMinutes\": 8,\n  \"url\": \"https://example.com/newman-video\",\n  \"description\": \"Created by Iter 2 Newman E2E\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/content",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "content"]
+        }
+      }
+    },
+    {
+      "name": "Register fresh student",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.environment.set('studentEmail', `newman-student-${Date.now()}@example.com`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "pm.test('Echoes registered email', () => pm.expect(pm.response.json().email).to.eql(pm.environment.get('studentEmail')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"password\": \"{{studentPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Student login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('Roles include STUDENT', () => pm.expect(body.roles).to.include('STUDENT'));",
+              "pm.environment.set('studentAccessToken', body.accessToken);",
+              "pm.environment.set('studentRefreshToken', body.refreshToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"password\": \"{{studentPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Student records a VIEW interaction",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201 (RECORDED)', () => pm.response.to.have.status(201));",
+              "pm.test('Result is RECORDED', () => pm.expect(pm.response.json().result).to.eql('RECORDED'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contentId\": {{newVideoContentId}},\n  \"eventType\": \"VIEW\",\n  \"dwellSec\": 30\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/interactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "interactions"]
+        }
+      }
+    },
+    {
+      "name": "Repeat VIEW within 10 minutes — debounced",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 200 (DEBOUNCED)', () => pm.response.to.have.status(200));",
+              "pm.test('Result is DEBOUNCED', () => pm.expect(pm.response.json().result).to.eql('DEBOUNCED'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contentId\": {{newVideoContentId}},\n  \"eventType\": \"VIEW\",\n  \"dwellSec\": 5\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/interactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "interactions"]
+        }
+      }
+    },
+    {
+      "name": "Student submits the seeded demo quiz",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('Body has attemptId', () => pm.expect(body.attemptId).to.be.a('number'));",
+              "pm.test('Score is 100.00 (one item, correct option chosen)', () => pm.expect(Number(body.score)).to.eql(100));",
+              "pm.test('Correct count is 1 of 1', () => {",
+              "  pm.expect(body.correctCount).to.eql(1);",
+              "  pm.expect(body.totalCount).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quizContentId\": {{seededQuizId}},\n  \"answers\": [\n    { \"itemOrder\": 1, \"selectedOptionOrder\": 1 }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/quiz-attempts",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "quiz-attempts"]
+        }
+      }
+    },
+    {
+      "name": "Student logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{studentRefreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"]
+        }
+      }
+    }
+  ]
+}

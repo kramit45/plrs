@@ -130,10 +130,20 @@ jobs:
           tail -n 200 app.log || true
           exit 1
 
-      - name: Run Newman collection
+      - name: Run Newman Iter 1 collection
         run: |
           newman run test/newman/plrs-iter1.postman_collection.json \
             -e test/newman/plrs-iter1.postman_environment.json
+
+      - name: Load Iter 2 seed
+        run: |
+          PGPASSWORD=plrs psql -h localhost -U plrs -d plrs \
+            -f test/newman/seed.sql
+
+      - name: Run Newman Iter 2 collection
+        run: |
+          newman run test/newman/plrs-iter2.postman_collection.json \
+            -e test/newman/plrs-iter2.postman_environment.json
 
       - name: Upload application log on failure
         if: failure()
