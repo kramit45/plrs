@@ -317,6 +317,19 @@ class CfGoldenIT {
             basePackages = "com.plrs.infrastructure")
     @org.springframework.data.jpa.repository.config.EnableJpaRepositories(
             basePackages = "com.plrs.infrastructure")
+    @org.springframework.context.annotation.ComponentScan(
+            basePackages = {"com.plrs.application", "com.plrs.infrastructure"},
+            excludeFilters =
+                    @org.springframework.context.annotation.ComponentScan.Filter(
+                            type =
+                                    org.springframework.context.annotation.FilterType
+                                            .REGEX,
+                            // Exclude every sibling IT (and its nested
+                            // *App config) so this context doesn't pick
+                            // up their @Bean methods. The pattern matches
+                            // any class containing "IT$" or ending in "IT"
+                            // anywhere under com.plrs.infrastructure.
+                            pattern = "com\\.plrs\\.infrastructure\\..*IT(\\$.*)?"))
     static class CfGoldenITApp {
 
         @org.springframework.context.annotation.Bean
