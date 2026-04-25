@@ -6,6 +6,7 @@ import com.plrs.domain.common.DomainValidationException;
 import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -258,6 +259,49 @@ public final class Content {
 
     public AuditFields audit() {
         return audit;
+    }
+
+    /**
+     * Validates that adding the edge {@code (this, prereq)} to the
+     * prerequisite DAG is legal. Throws {@link CycleDetectedException}
+     * if {@code prereq} is this content (self-edge), or if the supplied
+     * {@link PrerequisiteCheckingRepository} reports that an existing
+     * path from {@code prereq} back to this content would close a cycle.
+     *
+     * <p>The method is read-only — it does not persist the edge. The
+     * caller (an application-layer use case) is responsible for writing
+     * the edge after this passes. Splitting validation from persistence
+     * keeps the aggregate framework-free; the caller can compose this
+     * with whatever transactional boundary it needs.
+     *
+     * <p>The "repository passed in" pattern (§3.b.2.3) avoids holding a
+     * reference to the repository on the aggregate while still letting
+     * the aggregate own the policy. The narrower
+     * {@link PrerequisiteCheckingRepository} interface — distinct from
+     * {@link ContentRepository} — limits what the aggregate can ask of
+     * its caller.
+     *
+     * <p>Traces to: §3.b.2.3 (no-cycle invariant), §2.e.2.5 (CFD-4),
+     * FR-09 (prerequisite tracking).
+     *
+     * @throws DomainValidationException when {@code prereq} is null
+     * @throws CycleDetectedException when the edge would close a cycle
+     */
+    public void canAddPrerequisite(
+            ContentId prereq, PrerequisiteCheckingRepository checkingRepo) {
+        if (prereq == null) {
+            throw new DomainValidationException("prereq is required");
+        }
+        if (checkingRepo == null) {
+            throw new DomainValidationException("checkingRepo is required");
+        }
+        if (this.id.equals(prereq)) {
+            throw new CycleDetectedException(this.id, prereq, List.of(this.id));
+        }
+        List<ContentId> cyclePath = checkingRepo.findCyclePath(this.id, prereq);
+        if (cyclePath != null && !cyclePath.isEmpty()) {
+            throw new CycleDetectedException(this.id, prereq, cyclePath);
+        }
     }
 
     @Override
