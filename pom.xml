@@ -215,6 +215,26 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
             </plugin>
+
+            <!--
+              Aggregated Javadoc — write the cross-module HTML site to
+              docs/javadoc/. Run with `mvn javadoc:aggregate` from the
+              repo root. doclint=none keeps the build green despite the
+              odd missing @param/@return; show=protected covers the
+              same surface as the test suites.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.6.3</version>
+                <configuration>
+                    <reportOutputDirectory>${session.executionRootDirectory}/docs/javadoc</reportOutputDirectory>
+                    <destDir>.</destDir>
+                    <show>protected</show>
+                    <doclint>none</doclint>
+                    <quiet>true</quiet>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

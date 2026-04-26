@@ -115,7 +115,12 @@ public class SecurityConfig {
                                                 "/js/**",
                                                 "/webjars/**",
                                                 "/actuator/health",
-                                                "/actuator/info")
+                                                "/actuator/info",
+                                                // SpringDoc OpenAPI 3 / Swagger UI (NFR-22).
+                                                "/v3/api-docs",
+                                                "/v3/api-docs/**",
+                                                "/swagger-ui.html",
+                                                "/swagger-ui/**")
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())

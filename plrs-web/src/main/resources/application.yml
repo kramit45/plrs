@@ -42,6 +42,15 @@ management:
       exposure:
         include: health,info
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+    operationsSorter: alpha
+    tagsSorter: alpha
+
 plrs:
   jwt:
     access-token-ttl: 2h

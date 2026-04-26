@@ -11,6 +11,8 @@ import com.plrs.domain.topic.Topic;
 import com.plrs.domain.topic.TopicRepository;
 import com.plrs.domain.user.UserId;
 import com.plrs.web.common.PerUserRateLimiter;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/recommendations")
 @ConditionalOnProperty(name = "spring.datasource.url")
+@Tag(name = "Recommendations", description = "Personalised top-K slate (FR-24); per-user rate-limited (NFR-31)")
 public class RecommendationController {
 
     static final int MIN_K = 1;
@@ -74,6 +77,11 @@ public class RecommendationController {
 
     @GetMapping
     @PreAuthorize("hasRole('STUDENT') or hasRole('ADMIN')")
+    @Operation(
+            summary = "Get top-K recommendations for the caller (or for userId if ADMIN)",
+            description =
+                    "k clamped to [1, 50]. Non-ADMINs requesting another user's userId receive 403. "
+                            + "Per-user rate limit: 20 req/min — breaches return 429 with Retry-After.")
     public List<RecommendationResponse> get(
             @RequestParam(defaultValue = "10") int k,
             @RequestParam(required = false) UUID userId) {

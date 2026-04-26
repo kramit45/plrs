@@ -11,6 +11,10 @@ import com.plrs.domain.user.Role;
 import com.plrs.domain.user.User;
 import com.plrs.domain.user.UserId;
 import com.plrs.domain.user.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.Set;
@@ -69,6 +73,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @ConditionalOnProperty(name = "spring.datasource.url")
+@Tag(name = "Authentication", description = "Register, log in, and revoke refresh tokens")
 public class AuthController {
 
     private final RegisterUserUseCase registerUseCase;
@@ -88,6 +93,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @Operation(summary = "Register a new STUDENT user")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "User created"),
+        @ApiResponse(responseCode = "400", description = "Validation failed"),
+        @ApiResponse(responseCode = "409", description = "Email already in use")
+    })
     public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest req) {
         UserId id =
                 registerUseCase.handle(
@@ -105,6 +116,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(
+            summary = "Exchange credentials for an access + refresh token pair",
+            description =
+                    "401 is intentionally indistinguishable between unknown email and wrong password "
+                            + "to prevent account enumeration. Per-IP rate limit applies (NFR-31).")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Login successful"),
+        @ApiResponse(responseCode = "400", description = "Validation failed"),
+        @ApiResponse(responseCode = "401", description = "Bad credentials"),
+        @ApiResponse(responseCode = "423", description = "Account locked (FR-06)"),
+        @ApiResponse(responseCode = "429", description = "Per-IP login rate limit exceeded")
+    })
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
         LoginResult r = loginUseCase.handle(new LoginCommand(req.email(), req.password()));
         Set<String> roleNames = r.roles().stream().map(Role::name).collect(Collectors.toSet());
@@ -121,6 +144,12 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @Operation(summary = "Revoke a refresh token (idempotent — second call also returns 204)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Refresh token revoked"),
+        @ApiResponse(responseCode = "400", description = "Validation failed"),
+        @ApiResponse(responseCode = "401", description = "Invalid or expired token")
+    })
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest req) {
         logoutUseCase.handle(new LogoutCommand(req.refreshToken()));
         return ResponseEntity.noContent().build();

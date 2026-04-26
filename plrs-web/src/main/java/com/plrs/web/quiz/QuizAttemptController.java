@@ -4,6 +4,8 @@ import com.plrs.application.quiz.SubmitQuizAttemptCommand;
 import com.plrs.application.quiz.SubmitQuizAttemptResult;
 import com.plrs.application.quiz.SubmitQuizAttemptUseCase;
 import com.plrs.domain.quiz.AnswerSubmission;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/quiz-attempts")
 @ConditionalOnProperty(name = "spring.datasource.url")
+@Tag(name = "Quiz Attempts", description = "Submit quiz attempts; server-authoritative scoring (FR-20)")
 public class QuizAttemptController {
 
     private final SubmitQuizAttemptUseCase useCase;
@@ -38,6 +41,9 @@ public class QuizAttemptController {
 
     @PostMapping
     @PreAuthorize("hasRole('STUDENT')")
+    @Operation(
+            summary = "Submit a quiz attempt (STUDENT only)",
+            description = "Server-side scoring; updates mastery via TX-01 and emits an outbox event.")
     public ResponseEntity<SubmitQuizAttemptResponse> submit(
             @Valid @RequestBody SubmitQuizAttemptRequest req) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

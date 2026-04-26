@@ -15,6 +15,8 @@ import com.plrs.domain.content.PrerequisiteRepository;
 import com.plrs.domain.content.SearchPage;
 import com.plrs.domain.topic.TopicId;
 import com.plrs.domain.user.UserId;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -62,6 +64,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/content")
 @ConditionalOnProperty(name = "spring.datasource.url")
+@Tag(name = "Catalog", description = "Content authoring, lookup, search, and prereq DAG editing")
 public class ContentController {
 
     private final CreateContentUseCase createContentUseCase;
@@ -82,6 +85,7 @@ public class ContentController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
+    @Operation(summary = "Create a non-quiz content item (INSTRUCTOR/ADMIN)")
     public ResponseEntity<ContentCreatedResponse> create(
             @Valid @RequestBody CreateContentRequest req) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -105,6 +109,7 @@ public class ContentController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Load a content item with its prereq + dependent edges")
     public ContentDetailResponse get(@PathVariable Long id) {
         Content c =
                 contentRepository
@@ -127,6 +132,7 @@ public class ContentController {
      * browsing the catalogue is the default capability).
      */
     @GetMapping("/search")
+    @Operation(summary = "Paginated keyword search over title, description, and tags (FR-13)")
     public ContentSearchResponse search(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "20") int pageSize,
@@ -148,6 +154,9 @@ public class ContentController {
 
     @PostMapping("/{id}/prerequisites")
     @PreAuthorize("hasAnyRole('INSTRUCTOR','ADMIN')")
+    @Operation(
+            summary = "Add a prereq edge (INSTRUCTOR/ADMIN)",
+            description = "409 with cyclePath if the edge would introduce a cycle (defence in depth on top of V24).")
     public ResponseEntity<Void> addPrereq(
             @PathVariable Long id, @Valid @RequestBody AddPrereqRequest req) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
