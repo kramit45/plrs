@@ -1,0 +1,106 @@
+name: perf
+
+# Manual-only — JMeter runs are slow (10–20 min) and noisy on shared
+# runners. Trigger from the Actions tab when you want a perf snapshot.
+on:
+  workflow_dispatch:
+    inputs:
+      threads:
+        description: "Concurrent users"
+        required: false
+        default: "20"
+      duration:
+        description: "Total duration seconds (incl. ramp)"
+        required: false
+        default: "600"
+
+jobs:
+  jmeter:
+    name: JMeter recommendations load
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: plrs
+          POSTGRES_USER: plrs
+          POSTGRES_PASSWORD: plrs
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build app
+        run: mvn -B -DskipTests package
+
+      - name: Start app
+        run: |
+          nohup java -jar plrs-web/target/plrs-web-*.jar \
+              --plrs.jwt.generate-if-missing=true \
+              > app.log 2>&1 &
+          echo $! > app.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health >/dev/null; then
+              echo "App up"; exit 0;
+            fi
+            sleep 2
+          done
+          echo "App failed to come up"; cat app.log; exit 1
+
+      - name: Load seeds
+        run: |
+          PGPASSWORD=plrs psql -h localhost -U plrs -d plrs \
+              -f test/newman/seed.sql \
+              -f test/newman/seed-iter3.sql \
+              -f test/newman/seed-iter4.sql \
+              -f test/jmeter/seed-perf.sql
+
+      - name: Install JMeter
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jmeter
+
+      - name: Run JMeter scenario
+        env:
+          THREADS: ${{ inputs.threads }}
+          DURATION: ${{ inputs.duration }}
+        run: ./test/jmeter/run.sh
+
+      - name: Upload JMeter HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jmeter-report
+          path: test/jmeter/report
+          if-no-files-found: error
+
+      - name: Upload application log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log
+          if-no-files-found: ignore
+
+      - name: Stop app
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill "$(cat app.pid)" || true
+          fi
