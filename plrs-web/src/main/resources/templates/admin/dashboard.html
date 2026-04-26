@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Admin KPI Dashboard</h1>
+        <form id="refresh-form" th:action="@{/api/admin/kpi/refresh}" method="post"
+              class="d-inline">
+            <input type="hidden" th:if="${_csrf != null}"
+                   th:name="${_csrf.parameterName}"
+                   th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                Refresh KPIs
+            </button>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4 col-lg-2">
+            <div class="card shadow-sm h-100" id="kpi-coverage">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted">Coverage 7d</h6>
+                    <p class="display-6 mb-0"
+                       th:text="${#numbers.formatPercent(kpis.coverage7d().value(), 1, 1)}">
+                        --
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-2">
+            <div class="card shadow-sm h-100" id="kpi-ctr">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted">CTR 7d</h6>
+                    <p class="display-6 mb-0"
+                       th:text="${#numbers.formatPercent(kpis.ctr7d().value(), 1, 1)}">
+                        --
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-2">
+            <div class="card shadow-sm h-100" id="kpi-completion-avg">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted">Avg completion 30d</h6>
+                    <p class="display-6 mb-0"
+                       th:if="${not completionTrend.isEmpty()}"
+                       th:text="${#numbers.formatPercent(
+                                  #aggregates.avg(completionTrend.![completionRate()]),
+                                  1, 1)}">
+                        --
+                    </p>
+                    <p class="display-6 mb-0 text-muted"
+                       th:if="${completionTrend.isEmpty()}">—</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-2">
+            <div class="card shadow-sm h-100" id="kpi-cold-exposure">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted">Cold exposure 7d</h6>
+                    <p class="display-6 mb-0"
+                       th:text="${#numbers.formatPercent(kpis.coldItemExposure7d().value(), 1, 1)}">
+                        --
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-2">
+            <div class="card shadow-sm h-100" id="kpi-rating">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted">Avg rating (last week)</h6>
+                    <p class="display-6 mb-0"
+                       th:if="${not ratingTrend.isEmpty()}"
+                       th:text="${ratingTrend[0].avgRating()}">
+                        --
+                    </p>
+                    <p class="display-6 mb-0 text-muted"
+                       th:if="${ratingTrend.isEmpty()}">—</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-2">
+            <div class="card shadow-sm h-100" id="kpi-precision">
+                <div class="card-body">
+                    <h6 class="card-subtitle text-muted">Latest precision@10</h6>
+                    <p class="display-6 mb-0"
+                       th:if="${not kpis.latestEvalMetrics().isEmpty()}"
+                       th:text="${kpis.latestEvalMetrics()[0].precisionAtK()}">
+                        --
+                    </p>
+                    <p class="display-6 mb-0 text-muted"
+                       th:if="${kpis.latestEvalMetrics().isEmpty()}">—</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h6 card-title">Completion rate — last 30 days</h2>
+                    <canvas id="completionLineChart"
+                            th:attr="data-labels=${#strings.listJoin(completionTrend.![date()], ',')},
+                                     data-values=${#strings.listJoin(completionTrend.![completionRate()], ',')}"
+                            height="120">
+                    </canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h6 card-title">Avg rating — weekly</h2>
+                    <canvas id="ratingLineChart"
+                            th:attr="data-labels=${#strings.listJoin(ratingTrend.![isoYearWeek()], ',')},
+                                     data-values=${#strings.listJoin(ratingTrend.![avgRating()], ',')}"
+                            height="120">
+                    </canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/admin-charts.js}"></script>
+</div>
+</body>
+</html>

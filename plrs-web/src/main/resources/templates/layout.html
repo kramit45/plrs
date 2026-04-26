@@ -29,6 +29,9 @@
             <li class="nav-item me-2" sec:authorize="hasRole('ADMIN')">
                 <a class="nav-link" th:href="@{/admin}">Admin</a>
             </li>
+            <li class="nav-item me-2" sec:authorize="hasRole('ADMIN')">
+                <a class="nav-link" th:href="@{/admin/dashboard}">Admin Dashboard</a>
+            </li>
             <li class="nav-item me-2" sec:authorize="isAuthenticated()">
                 <span class="navbar-text" sec:authentication="name">user</span>
             </li>
