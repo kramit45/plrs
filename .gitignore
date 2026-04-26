@@ -40,3 +40,8 @@ dist/
 build/
 out/
 bin/
+
+# Submission package + generated docs (regenerated on demand)
+submission/
+docs/javadoc/
+docs/python/
