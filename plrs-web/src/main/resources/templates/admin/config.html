@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <h1 class="h3 mb-4">Runtime Configuration</h1>
+    <p class="text-muted small mb-3">
+        Edits invalidate the in-process cache; the next read by
+        HybridRanker, MmrReranker, or PathPlanner picks up the new
+        value. Updates are audited (CONFIG_PARAM_UPDATED).
+    </p>
+
+    <table class="table table-sm align-middle" id="config-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Description</th>
+                <th>Updated</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="p : ${params}">
+                <td><code th:text="${p.name()}">name</code></td>
+                <td><span class="badge bg-secondary" th:text="${p.valueType()}">DOUBLE</span></td>
+                <td>
+                    <form th:action="@{/admin/config/{n}(n=${p.name()})}" method="post"
+                          class="d-flex gap-1">
+                        <input type="hidden" th:if="${_csrf != null}"
+                               th:name="${_csrf.parameterName}"
+                               th:value="${_csrf.token}"/>
+                        <input type="text" name="value" class="form-control form-control-sm"
+                               th:value="${p.value()}" required/>
+                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                    </form>
+                </td>
+                <td class="small text-muted" th:text="${p.description().orElse('')}">desc</td>
+                <td class="small" th:text="${p.updatedAt()}">2026-04-26T10:00:00Z</td>
+                <td class="small text-muted"
+                    th:text="${p.updatedBy().isPresent() ? p.updatedBy().get().toString().substring(0,8) : '—'}">—</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

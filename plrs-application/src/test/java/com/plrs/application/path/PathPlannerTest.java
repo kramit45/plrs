@@ -50,7 +50,14 @@ class PathPlannerTest {
     @Mock private UserSkillRepository skillRepo;
 
     private PathPlanner planner() {
-        return new PathPlanner(contentRepo, prereqRepo, skillRepo, CLOCK);
+        return new PathPlanner(
+                contentRepo,
+                prereqRepo,
+                skillRepo,
+                CLOCK,
+                (org.springframework.beans.factory.ObjectProvider<
+                                com.plrs.application.admin.ConfigParamService>)
+                        null);
     }
 
     private Content content(long id, TopicId topicId, String title) {

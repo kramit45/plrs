@@ -77,16 +77,34 @@ public class PathPlanner {
     private final PrerequisiteRepository prerequisiteRepository;
     private final UserSkillRepository userSkillRepository;
     private final Clock clock;
+    /** Optional FR-40 tunable; falls back to {@link #SKIP_THRESHOLD} when absent. */
+    private final org.springframework.beans.factory.ObjectProvider<
+                    com.plrs.application.admin.ConfigParamService>
+            configProvider;
 
     public PathPlanner(
             ContentRepository contentRepository,
             PrerequisiteRepository prerequisiteRepository,
             UserSkillRepository userSkillRepository,
-            Clock clock) {
+            Clock clock,
+            org.springframework.beans.factory.ObjectProvider<
+                            com.plrs.application.admin.ConfigParamService>
+                    configProvider) {
         this.contentRepository = contentRepository;
         this.prerequisiteRepository = prerequisiteRepository;
         this.userSkillRepository = userSkillRepository;
         this.clock = clock;
+        this.configProvider = configProvider;
+    }
+
+    private double skipThreshold() {
+        com.plrs.application.admin.ConfigParamService svc =
+                configProvider == null ? null : configProvider.getIfAvailable();
+        if (svc == null) {
+            return SKIP_THRESHOLD;
+        }
+        java.util.OptionalDouble cfg = svc.getDouble("path.skip_threshold");
+        return cfg.isPresent() ? cfg.getAsDouble() : SKIP_THRESHOLD;
     }
 
     public LearnerPathDraft plan(UserId userId, TopicId targetTopicId) {
@@ -125,6 +143,7 @@ public class PathPlanner {
         // 4. Prune: drop items whose owning topic is already mastered.
         Map<ContentId, Content> contentCache = new HashMap<>();
         Set<ContentId> pruned = new HashSet<>();
+        double skipThreshold = skipThreshold();
         for (ContentId cid : required) {
             Content c = contentRepository.findById(cid).orElse(null);
             if (c == null) {
@@ -133,7 +152,7 @@ public class PathPlanner {
             contentCache.put(cid, c);
             double topicMastery =
                     mastery.getOrDefault(c.topicId(), MasteryScore.ZERO).value();
-            if (topicMastery < SKIP_THRESHOLD) {
+            if (topicMastery < skipThreshold) {
                 pruned.add(cid);
             }
         }

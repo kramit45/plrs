@@ -29,7 +29,13 @@ class HybridRankerTest {
     @Mock private PopularityScorer popularityScorer;
 
     private HybridRanker ranker() {
-        return new HybridRanker(cfScorer, cbScorer, popularityScorer);
+        return new HybridRanker(
+                cfScorer,
+                cbScorer,
+                popularityScorer,
+                (org.springframework.beans.factory.ObjectProvider<
+                                com.plrs.application.admin.ConfigParamService>)
+                        null);
     }
 
     @Test

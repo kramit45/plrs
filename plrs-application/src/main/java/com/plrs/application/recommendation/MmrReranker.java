@@ -44,9 +44,28 @@ public class MmrReranker {
     public static final int DEFAULT_POOL_SIZE = 50;
 
     private final ContentSimilarity similarity;
+    /** Optional FR-40 tunable; falls back to {@link #LAMBDA_MMR} when absent. */
+    private final org.springframework.beans.factory.ObjectProvider<
+                    com.plrs.application.admin.ConfigParamService>
+            configProvider;
 
-    public MmrReranker(ContentSimilarity similarity) {
+    public MmrReranker(
+            ContentSimilarity similarity,
+            org.springframework.beans.factory.ObjectProvider<
+                            com.plrs.application.admin.ConfigParamService>
+                    configProvider) {
         this.similarity = similarity;
+        this.configProvider = configProvider;
+    }
+
+    private double lambdaMmr() {
+        com.plrs.application.admin.ConfigParamService svc =
+                configProvider == null ? null : configProvider.getIfAvailable();
+        if (svc == null) {
+            return LAMBDA_MMR;
+        }
+        java.util.OptionalDouble cfg = svc.getDouble("rec.lambda_mmr");
+        return cfg.isPresent() ? cfg.getAsDouble() : LAMBDA_MMR;
     }
 
     /**
@@ -88,7 +107,8 @@ public class MmrReranker {
                         maxSim = sim;
                     }
                 }
-                double mmr = LAMBDA_MMR * rel - (1.0 - LAMBDA_MMR) * maxSim;
+                double lm = lambdaMmr();
+                double mmr = lm * rel - (1.0 - lm) * maxSim;
                 if (mmr > bestScore) {
                     bestScore = mmr;
                     best = c;

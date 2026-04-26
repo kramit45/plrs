@@ -26,7 +26,11 @@ class MmrRerankerTest {
     @Mock private ContentSimilarity similarity;
 
     private MmrReranker reranker() {
-        return new MmrReranker(similarity);
+        return new MmrReranker(
+                similarity,
+                (org.springframework.beans.factory.ObjectProvider<
+                                com.plrs.application.admin.ConfigParamService>)
+                        null);
     }
 
     @Test

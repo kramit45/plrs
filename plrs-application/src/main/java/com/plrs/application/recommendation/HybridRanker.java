@@ -40,14 +40,36 @@ public class HybridRanker {
     private final CfScorer cfScorer;
     private final CbScorer cbScorer;
     private final PopularityScorer popularityScorer;
+    /**
+     * FR-40: optional dependency so tests that wire HybridRanker
+     * directly don't have to provide a ConfigParamService. When
+     * absent or value missing, falls back to {@link #LAMBDA_BLEND}.
+     */
+    private final org.springframework.beans.factory.ObjectProvider<
+                    com.plrs.application.admin.ConfigParamService>
+            configProvider;
 
     public HybridRanker(
             CfScorer cfScorer,
             CbScorer cbScorer,
-            PopularityScorer popularityScorer) {
+            PopularityScorer popularityScorer,
+            org.springframework.beans.factory.ObjectProvider<
+                            com.plrs.application.admin.ConfigParamService>
+                    configProvider) {
         this.cfScorer = cfScorer;
         this.cbScorer = cbScorer;
         this.popularityScorer = popularityScorer;
+        this.configProvider = configProvider;
+    }
+
+    private double lambdaBlend() {
+        com.plrs.application.admin.ConfigParamService svc =
+                configProvider == null ? null : configProvider.getIfAvailable();
+        if (svc == null) {
+            return LAMBDA_BLEND;
+        }
+        java.util.OptionalDouble cfg = svc.getDouble("rec.lambda_blend");
+        return cfg.isPresent() ? cfg.getAsDouble() : LAMBDA_BLEND;
     }
 
     public Map<ContentId, Blended> blend(UserId userId, Set<ContentId> candidates) {
@@ -63,6 +85,7 @@ public class HybridRanker {
         boolean coldStart =
                 cfAvg < COLD_START_THRESHOLD && cbAvg < COLD_START_THRESHOLD;
 
+        double lambda = lambdaBlend();
         Map<ContentId, Blended> out = new HashMap<>(candidates.size());
         for (ContentId c : candidates) {
             double cfS = cf.getOrDefault(c, 0.0);
@@ -70,7 +93,7 @@ public class HybridRanker {
             double popS = pop.getOrDefault(c, 0.0);
             double score = coldStart
                     ? popS
-                    : LAMBDA_BLEND * cfS + (1.0 - LAMBDA_BLEND) * cbS;
+                    : lambda * cfS + (1.0 - lambda) * cbS;
             out.put(c, new Blended(score, cfS, cbS, popS, coldStart));
         }
         return out;
