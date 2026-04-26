@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.4.0] — Iteration 4 — 2026-04-26
+
+The fourth iteration delivers the FR-31 path planner, FR-36 admin
+KPI dashboard, FR-06 account lockout, FR-04 password reset,
+FR-10/11 CSV bulk import + export, FR-40 runtime tunables, FR-42
+audit log viewer, the nightly integrity-checks defence-in-depth
+sweep, plus a security-hardening pass (per-IP login rate limit,
+RBAC matrix audit, CSP tightening). 24 commits on `main`, all green
+in CI.
+
+### Features — domain (path aggregate)
+
+- `8f832e2` feat(domain): add PathId, LearnerPathStatus, StepStatus
+- `962f4cf` feat(domain): add LearnerPath aggregate with status transitions
+
+### Features — application (path use cases + planner + admin services)
+
+- `3e8f70a` feat(application): add PathPlanner implementing algorithm A6
+- `bd27a6f` feat(application): add Generate/Start/Pause/Resume/MarkStepDone/Abandon path use cases
+- `32425eb` feat(application): add KpiService reading materialised views
+- `ff7718d` feat(application+web): CSV bulk import for content per FR-10
+- `814c2e3` feat(security): password reset request + confirm endpoints per FR-04 (minimum)
+- `c469081` feat(admin): runtime tunables in config_params with cache + admin UI
+
+### Features — infrastructure (path adapter + warehouse + integrity)
+
+- `091e7ee` feat(infra): add flyway v18 learner_paths + steps with one-active partial unique
+- `8cd7d69` feat(infra): add LearnerPathRepository adapter with JSONB snapshot mapping
+- `cbadd54` feat(infra): add flyway v19 fact_recommendation table + 6 KPI materialised views
+- `fdbf4cf` feat(infra): emit fact_recommendation rows on serve to backfill KPI views
+- `8b861dd` feat(infra): add nightly integrity checks job (DAG, orphans, bounds, version)
+
+### Features — security
+
+- `f49c955` feat(security): account lockout after 5 failed logins per FR-06
+- `e4ea077` feat(web): IP-based rate limit on /api/auth/login
+- `4bc957d` feat(security): consolidate full RBAC matrix with reflective PreAuthorize audit
+- `7bc6247` feat(web): security headers audit and CSP tightening (no inline scripts)
+
+### Features — web
+
+- `66da693` feat(web): add /api/learning-path REST endpoints
+- `32d5ede` feat(web): add Thymeleaf path generate + view + dashboard active-path card
+- `355f4c6` feat(web): add /admin/dashboard with KPI tiles and Chart.js trends
+- `772ba6a` feat(web): CSV export of catalogue per FR-11
+- `1e5eeb1` feat(web): admin audit log viewer per FR-42
+
+### Tests — e2e
+
+- `809ed16` test(e2e): Newman Iter 4 collection covering paths, admin, lockout, CSV
+- `d47defa` test(e2e): Playwright path planner + admin dashboard flows
+
+### Docs
+
+- (this commit) docs: iteration 4 readme, changelog, demo script
+
 ## [0.3.0] — Iteration 3 — 2026-04-26
 
 The third iteration delivers the recommender pipeline (CF + CB +

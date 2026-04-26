@@ -10,18 +10,22 @@ into a single deployable Java application.
 
 ## Status
 
-**Iteration 3 complete — recommender (CF + CB + MMR), Python ML
-microservice, Kafka producer, minimum warehouse, offline eval.**
-Building on the Iter 2 catalogue + EWMA mastery, Iter 3 adds the full
-recommender pipeline (popularity → item-item CF → TF-IDF CB → λ-blend
-→ MMR diversification → prereq + feasibility filters), an external
-Python ML microservice that owns the heavy scikit-learn / `implicit`
-work behind HMAC-signed endpoints, a `KafkaOutboxPublisher` that the
-existing outbox drain can swap to, a Python ETL worker that consumes
-`plrs.interactions` into a minimum `plrs_dw` warehouse star (dim_date,
-dim_user, dim_content, dim_topic, fact_interaction, fact_eval_run),
-the `Recommended for you` dashboard card, and an `/admin` page with a
-Run Evaluation tile that computes precision@10 / ndcg@10 / coverage.
+**Iteration 4 complete — paths, admin dashboard, security hardening.**
+Building on the Iter 3 recommender + warehouse, Iter 4 adds FR-31
+prerequisite-aware learner paths (planner + REST + Thymeleaf views +
+dashboard card), the FR-36 admin KPI dashboard backed by six
+`plrs_dw` materialised views (with a scheduled refresh job and
+direct `fact_recommendation` writes on serve so the views see data),
+FR-06 account lockout (5 failures / 15 min → 423), per-IP rate
+limiting on `/api/auth/login`, FR-04 password-reset (request +
+confirm REST endpoints with refresh-token revocation on confirm),
+FR-10/11 CSV bulk import + export for content, an FR-42 admin audit
+log viewer, FR-40 runtime-tunable parameters editable from
+`/admin/config` (with `@Cacheable` reads + `@CacheEvict` on update,
+wired into `HybridRanker` / `MmrReranker` / `PathPlanner`), a
+nightly integrity-checks job (DAG cycle + orphan rows + mastery
+bounds + version monotonicity), and a CSP tightening pass that
+externalised every remaining inline `<script>`.
 
 ## Prerequisites
 
@@ -202,6 +206,66 @@ What `mvn verify` covers:
   the BCrypt adapter.
 - `plrs-web`: `@WebMvcTest` slices for every controller and filter
   plus a security-routing slice that drives the full filter chain.
+
+## Iteration 4 scope
+
+**Included**
+
+- Path planner (algorithm A6, §3.c.5.6) with `LearnerPath` aggregate,
+  V18 partial-unique-active schema invariant, REST surface
+  (`/api/learning-path`), Thymeleaf views (`/path/generate`,
+  `/path/{id}`), dashboard active-path card.
+- Admin KPI dashboard at `/admin/dashboard` with six tiles
+  (coverage, CTR, completion-rate avg, cold-item exposure, weekly
+  rating, latest precision@10) and two Chart.js trend lines
+  (30-day completion + weekly rating). Backed by six materialised
+  views (V19) with `RefreshKpiViewsJob` cron + manual refresh.
+  `SpringDataRecommendationRepository` mirrors writes to
+  `fact_recommendation` so the views have data without waiting for
+  the Kafka → ETL hop.
+- FR-06 account lockout: V21 columns + atomic CASE-based decision
+  SQL, 423 + `Retry-After`, ADMIN unlock at
+  `POST /api/admin/users/{id}/unlock`.
+- NFR-31 IP-based rate limit on `/api/auth/login` (10 attempts per
+  5 min per source IP), wired before the JWT filter.
+- FR-04 password reset (minimum): V22 reset_token columns,
+  `/api/auth/password-reset/{request,confirm}` endpoints with
+  enumeration-proof 204 on request, `RefreshTokenStore.revokeAllForUser`
+  on confirm so old sessions can't survive the change.
+- FR-10/11 CSV bulk import + export of catalogue content
+  (`/api/content/{import,export}`).
+- Reflective `PreAuthorizeAuditTest` enforcing every mutating
+  endpoint is `@PreAuthorize`-guarded, with an explicit
+  `PUBLIC_ALLOWLIST` for the deliberately public auth surface.
+- FR-42 audit log viewer at `/admin/audit` with actor/action/date
+  filters and pagination.
+- FR-40 runtime-tunable parameters: V23 `config_params`,
+  `ConfigParamService` with `@Cacheable` reads + `@CacheEvict` on
+  update, admin editor at `/admin/config`. `HybridRanker`,
+  `MmrReranker`, `PathPlanner` now resolve their key thresholds
+  from the service (with hardcoded defaults as fallback).
+- Nightly `IntegrityChecksJob` (DAG-acyclic via recursive CTE,
+  orphan-interactions, mastery-bounds, user-skills-version
+  non-negative) writing to V24 `plrs_ops.integrity_checks`.
+- CSP tightening: every inline `<script>` externalised; no
+  `'unsafe-inline'` in `script-src`. Header audit test covers HSTS,
+  X-Frame-Options, Referrer-Policy, Permissions-Policy, X-Robots-Tag.
+- Newman Iter 4 collection (paths + admin + lockout + CSV) with CI
+  step; Playwright Iter 4 E2Es (path planner flow + admin dashboard
+  flow) gated by `E2E=true`.
+
+**Deferred to Iter 5**
+
+- Diagnostic quiz (FR-23) — was provisionally listed for Iter 4
+  but didn't make the timing.
+- JMeter load tests (NFR-13/14/17).
+- Chaos tests (NFR-9/10/11).
+- axe-core accessibility audit.
+- OWASP ZAP automated scan in CI.
+- Email-based password reset (real SMTP).
+- SCD-2 dimensions in the warehouse.
+- Per-instructor admin dashboard.
+- Backup verification.
 
 ## Iteration 3 scope
 

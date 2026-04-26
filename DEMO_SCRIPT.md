@@ -1,4 +1,4 @@
-# PLRS — Iteration 3 demo script
+# PLRS — Iteration 4 demo script
 
 Step-by-step walkthrough for the MCSP-232 viva. Every command below
 is copy-paste runnable from the repository root, given the listed
@@ -244,6 +244,106 @@ The fallback toggle is `plrs.ml.base-url`: when unreachable, both
 return their in-process result, while `RunEvalUseCase` is gated off
 since precision@10 / ndcg@10 / coverage requires the slate the
 Python service computes.
+
+## 9. Iter 4 — paths, admin dashboard, security hardening
+
+### 9a. Student generates a path and marks a step done
+
+1. Logged in as the §4 student, visit `/path/generate`.
+2. Pick a target topic from the dropdown, click **Plan path**.
+3. Land on `/path/{id}` — the prerequisite-aware step list renders
+   with PENDING badges.
+4. Click **Mark done** on step 1. Page reloads, badge flips to
+   **DONE**.
+5. Navigate back to `/dashboard` — the **Your active learning path**
+   card shows the progress bar at `1 / N done` and surfaces the
+   next-up step title.
+
+### 9b. Admin KPI dashboard
+
+1. Promote a user to ADMIN (or use the Newman seed admin):
+   ```sql
+   INSERT INTO plrs_ops.user_roles (user_id, role, assigned_at)
+   VALUES ('99999999-9999-9999-9999-999999999992', 'ADMIN', NOW())
+   ON CONFLICT DO NOTHING;
+   ```
+2. Log in as that admin → click **Admin Dashboard** in the nav.
+3. All six KPI tiles populate (coverage, CTR, avg completion 30d,
+   cold exposure, avg rating, latest precision@10).
+4. Click **Refresh KPIs** to re-run `RefreshKpiViewsJob.refreshNow()`.
+
+### 9c. Runtime tunables
+
+1. From the same admin session, visit `/admin/config`.
+2. Change `rec.lambda_blend` from `0.65` to `0.50`, click **Save**.
+3. Visit `/dashboard` as a student — the **Recommended for you**
+   slate re-blends with the new λ on the next fetch (cache evict
+   triggered by the update).
+4. Verify in psql:
+   ```sql
+   SELECT param_name, param_value, updated_at
+     FROM plrs_ops.config_params
+    WHERE param_name = 'rec.lambda_blend';
+   ```
+
+### 9d. Account lockout (FR-06)
+
+```bash
+# 5 wrong-password POSTs lock the account
+for i in 1 2 3 4 5; do
+    curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+        http://localhost:8080/api/auth/login \
+        -H 'Content-Type: application/json' \
+        -d '{"email":"newman-lockee@example.com","password":"WRONG"}'
+done
+
+# 6th correct-password attempt → 423 Locked + Retry-After
+curl -i -X POST http://localhost:8080/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"newman-lockee@example.com","password":"LockeePass01"}'
+```
+
+Admin unlocks via the JWT API or psql:
+```bash
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+    -H 'Content-Type: application/json' \
+    -d '{"email":"newman-admin@example.com","password":"AdminPass01"}' | jq -r .accessToken)
+curl -X POST http://localhost:8080/api/admin/users/99999999-9999-9999-9999-999999999993/unlock \
+    -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+### 9e. CSV bulk import + export (FR-10/11)
+
+```bash
+# Round-trip: export, import the same file back
+curl -H "Authorization: Bearer $INSTRUCTOR_TOKEN" \
+    http://localhost:8080/api/content/export -o /tmp/catalogue.csv
+
+# Add an invalid row (bad ctype) to demo per-row error reporting
+echo 'Iter4 Path Target,Bad Row,DOCUMENT,BEGINNER,5,https://x.y/bad' >> /tmp/catalogue.csv
+
+curl -X POST http://localhost:8080/api/content/import \
+    -H "Authorization: Bearer $INSTRUCTOR_TOKEN" \
+    -F file=@/tmp/catalogue.csv | jq
+# {"saved": N, "errors": [{"rowNumber": ..., "message": "Unknown ctype: DOCUMENT"}]}
+```
+
+### 9f. Audit log viewer (FR-42)
+
+1. Visit `/admin/audit`. Filter by `action=USER_REGISTERED` to see
+   every registration event; add a date range to slice.
+2. Click into the JSON detail column to see the audited payload.
+
+### 9g. Iter 4 Newman collection
+
+```bash
+PGPASSWORD=plrs psql -h localhost -U plrs -d plrs \
+    -f test/newman/seed-iter4.sql
+./test/newman/run-iter4.sh
+```
+
+15 requests covering path planner → CSV import/export → lockout →
+admin unlock → recovery → recommendations.
 
 ## Stopping the demo
 
