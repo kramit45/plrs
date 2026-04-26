@@ -245,7 +245,10 @@ class SpringDataRecommendationRepositoryIT extends PostgresTestBase {
     @SpringBootApplication(
             scanBasePackages = {
                 "com.plrs.infrastructure.recommendation",
-                "com.plrs.infrastructure.user"
+                "com.plrs.infrastructure.user",
+                "com.plrs.infrastructure.content",
+                "com.plrs.infrastructure.topic",
+                "com.plrs.infrastructure.warehouse"
             },
             exclude = {
                 RedisAutoConfiguration.class,
@@ -254,12 +257,16 @@ class SpringDataRecommendationRepositoryIT extends PostgresTestBase {
     @org.springframework.boot.autoconfigure.domain.EntityScan(
             basePackages = {
                 "com.plrs.infrastructure.recommendation",
-                "com.plrs.infrastructure.user"
+                "com.plrs.infrastructure.user",
+                "com.plrs.infrastructure.content",
+                "com.plrs.infrastructure.topic"
             })
     @org.springframework.data.jpa.repository.config.EnableJpaRepositories(
             basePackages = {
                 "com.plrs.infrastructure.recommendation",
-                "com.plrs.infrastructure.user"
+                "com.plrs.infrastructure.user",
+                "com.plrs.infrastructure.content",
+                "com.plrs.infrastructure.topic"
             })
     static class RecsRepoITApp {}
 }
