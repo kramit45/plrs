@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <h1 class="h3 mb-4">Audit Log</h1>
+
+    <form method="get" th:action="@{/admin/audit}" class="card shadow-sm mb-4">
+        <div class="card-body row g-2">
+            <div class="col-md-3">
+                <label class="form-label small mb-0">Actor (UUID)</label>
+                <input type="text" name="actor" class="form-control form-control-sm"
+                       th:value="${filterActor}"/>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-0">Action</label>
+                <input type="text" name="action" class="form-control form-control-sm"
+                       placeholder="USER_REGISTERED"
+                       th:value="${filterAction}"/>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">From (ISO instant)</label>
+                <input type="text" name="from" class="form-control form-control-sm"
+                       th:value="${filterFrom}"/>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">To</label>
+                <input type="text" name="to" class="form-control form-control-sm"
+                       th:value="${filterTo}"/>
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button type="submit" class="btn btn-sm btn-primary w-100">Apply</button>
+            </div>
+        </div>
+    </form>
+
+    <p class="text-muted small">
+        Page <span th:text="${page.pageNumber() + 1}">1</span> ·
+        <span th:text="${page.pageSize()}">50</span> per page ·
+        <span th:text="${page.totalRows()}">0</span> total rows
+    </p>
+
+    <table class="table table-sm table-striped" id="audit-table">
+        <thead>
+            <tr>
+                <th>Occurred at</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity type</th>
+                <th>Entity id</th>
+                <th>Detail (truncated)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="e : ${page.entries()}">
+                <td th:text="${e.occurredAt()}">2026-04-26T10:00:00Z</td>
+                <td th:text="${e.actorUserId().orElse(null)}">—</td>
+                <td><code th:text="${e.action()}">USER_REGISTERED</code></td>
+                <td th:text="${e.entityType().orElse('')}">user</td>
+                <td th:text="${e.entityId().orElse('')}">—</td>
+                <td>
+                    <code th:text="${#strings.abbreviate(e.detailJson().orElse(''), 80)}">{}</code>
+                </td>
+            </tr>
+            <tr th:if="${page.entries().isEmpty()}">
+                <td colspan="6" class="text-muted text-center">No matching audit rows.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <nav>
+        <ul class="pagination pagination-sm">
+            <li class="page-item" th:classappend="${page.pageNumber() == 0} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/admin/audit(actor=${filterActor},action=${filterAction},from=${filterFrom},to=${filterTo},page=${page.pageNumber() - 1},size=${page.pageSize()})}">
+                    Previous
+                </a>
+            </li>
+            <li class="page-item"
+                th:classappend="${(page.pageNumber() + 1) * page.pageSize() >= page.totalRows()} ? 'disabled'">
+                <a class="page-link"
+                   th:href="@{/admin/audit(actor=${filterActor},action=${filterAction},from=${filterFrom},to=${filterTo},page=${page.pageNumber() + 1},size=${page.pageSize()})}">
+                    Next
+                </a>
+            </li>
+        </ul>
+    </nav>
+</div>
+</body>
+</html>
