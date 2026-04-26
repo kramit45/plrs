@@ -5,6 +5,7 @@ import com.plrs.application.content.ContentTitleNotUniqueException;
 import com.plrs.application.security.InvalidTokenException;
 import com.plrs.application.topic.TopicAlreadyExistsException;
 import com.plrs.application.topic.TopicNotFoundException;
+import com.plrs.application.user.AccountLockedException;
 import com.plrs.application.user.EmailAlreadyRegisteredException;
 import com.plrs.application.user.InvalidCredentialsException;
 import com.plrs.domain.common.DomainValidationException;
@@ -240,6 +241,28 @@ public class GlobalExceptionHandler {
                 "invalid-credentials",
                 "Unauthorized",
                 "Invalid email or password");
+    }
+
+    /**
+     * FR-06: account locked. 423 Locked + {@code Retry-After} header so
+     * clients can back off until the lock expires.
+     */
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ProblemDetail> handleAccountLocked(AccountLockedException e) {
+        long retryAfter =
+                Math.max(0, e.lockedUntil().getEpochSecond() - java.time.Instant.now().getEpochSecond());
+        ProblemDetail body =
+                problem(
+                        HttpStatus.LOCKED,
+                        "account-locked",
+                        "Account locked",
+                        "Too many failed login attempts. Try again later.");
+        body.setProperty("retryAfterSeconds", retryAfter);
+        body.setProperty("lockedUntil", e.lockedUntil().toString());
+        return ResponseEntity.status(HttpStatus.LOCKED)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfter))
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(body);
     }
 
     @ExceptionHandler(InvalidTokenException.class)

@@ -137,6 +137,101 @@ class SpringDataUserRepositoryIT extends PostgresTestBase {
     }
 
     @Test
+    void initialLockedUntilIsEmpty() {
+        User saved = userRepository.save(newUser(uniqueEmail()));
+        assertThat(userRepository.getLockedUntil(saved.id())).isEmpty();
+    }
+
+    @Test
+    void fiveFailuresWithinFifteenMinutesLocks() {
+        User saved = userRepository.save(newUser(uniqueEmail()));
+        Instant t = Instant.parse("2026-04-26T12:00:00Z");
+
+        for (int i = 0; i < 5; i++) {
+            userRepository.recordLoginFailure(saved.id(), t.plusSeconds(i * 30));
+        }
+
+        assertThat(userRepository.getLockedUntil(saved.id()))
+                .as("five failures within window must lock the account")
+                .isPresent();
+    }
+
+    @Test
+    void failureOlderThanFifteenMinResetsCounter() {
+        User saved = userRepository.save(newUser(uniqueEmail()));
+        Instant t = Instant.parse("2026-04-26T12:00:00Z");
+
+        // Four failures inside the window, then one well outside.
+        for (int i = 0; i < 4; i++) {
+            userRepository.recordLoginFailure(saved.id(), t.plusSeconds(i * 30));
+        }
+        // 30 minutes later — counter should reset to 1, no lock.
+        userRepository.recordLoginFailure(saved.id(), t.plusSeconds(60 * 30));
+
+        assertThat(userRepository.getLockedUntil(saved.id())).isEmpty();
+    }
+
+    @Test
+    void successResetsCounterAndLock() {
+        User saved = userRepository.save(newUser(uniqueEmail()));
+        Instant t = Instant.parse("2026-04-26T12:00:00Z");
+        for (int i = 0; i < 5; i++) {
+            userRepository.recordLoginFailure(saved.id(), t.plusSeconds(i * 30));
+        }
+        assertThat(userRepository.getLockedUntil(saved.id())).isPresent();
+
+        userRepository.recordLoginSuccess(saved.id());
+
+        assertThat(userRepository.getLockedUntil(saved.id())).isEmpty();
+        Integer count =
+                jdbcTemplate.queryForObject(
+                        "SELECT failed_login_count FROM plrs_ops.users WHERE id = ?",
+                        Integer.class,
+                        saved.id().value());
+        assertThat(count).isZero();
+    }
+
+    @Test
+    void unlockClearsLockAndCounter() {
+        User saved = userRepository.save(newUser(uniqueEmail()));
+        Instant t = Instant.parse("2026-04-26T12:00:00Z");
+        for (int i = 0; i < 5; i++) {
+            userRepository.recordLoginFailure(saved.id(), t.plusSeconds(i * 30));
+        }
+
+        userRepository.unlock(saved.id());
+
+        assertThat(userRepository.getLockedUntil(saved.id())).isEmpty();
+        Integer count =
+                jdbcTemplate.queryForObject(
+                        "SELECT failed_login_count FROM plrs_ops.users WHERE id = ?",
+                        Integer.class,
+                        saved.id().value());
+        assertThat(count).isZero();
+    }
+
+    @Test
+    void expiredLockIsClearedOnRead() {
+        User saved = userRepository.save(newUser(uniqueEmail()));
+        // Hand-set locked_until to a past timestamp so it qualifies as expired.
+        jdbcTemplate.update(
+                "UPDATE plrs_ops.users SET locked_until = NOW() - INTERVAL '1 second'"
+                        + " WHERE id = ?",
+                saved.id().value());
+
+        assertThat(userRepository.getLockedUntil(saved.id())).isEmpty();
+
+        // Confirm the column was NULL-ed as a courtesy.
+        Integer rowsWithLock =
+                jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM plrs_ops.users"
+                                + " WHERE id = ? AND locked_until IS NOT NULL",
+                        Integer.class,
+                        saved.id().value());
+        assertThat(rowsWithLock).isZero();
+    }
+
+    @Test
     void duplicateEmailSaveRaisesDataIntegrityViolation() {
         Email shared = uniqueEmail();
         userRepository.save(newUser(shared));

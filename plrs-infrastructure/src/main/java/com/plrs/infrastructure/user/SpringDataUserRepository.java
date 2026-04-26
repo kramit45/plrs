@@ -6,6 +6,9 @@ import com.plrs.domain.user.UserId;
 import com.plrs.domain.user.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -94,5 +97,114 @@ public class SpringDataUserRepository implements UserRepository {
                         .findFirst()
                         .orElse(null);
         return result == null ? 0L : ((Number) result).longValue();
+    }
+
+    /** FR-06 lock window. */
+    static final Duration FAIL_WINDOW = Duration.ofMinutes(15);
+
+    /** FR-06 lock duration. */
+    static final Duration LOCK_DURATION = Duration.ofMinutes(15);
+
+    /** FR-06 fail-count threshold within {@link #FAIL_WINDOW}. */
+    static final int LOCKOUT_THRESHOLD = 5;
+
+    /**
+     * Reads {@code locked_until}, NULL-ing an expired lock as a courtesy
+     * so callers don't see stale state. The clear runs in a separate
+     * statement (after the SELECT) and is best-effort — concurrent
+     * recordLoginFailure runs are still correct because the lockout
+     * decision uses an atomic single-SQL CASE.
+     */
+    @Override
+    @Transactional
+    public Optional<Instant> getLockedUntil(UserId userId) {
+        // getResultList tolerates a NULL locked_until column without
+        // tripping the stream's NPE-on-null behaviour.
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> rows =
+                em.createNativeQuery(
+                                "SELECT locked_until FROM plrs_ops.users WHERE id = :userId")
+                        .setParameter("userId", userId.value())
+                        .getResultList();
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return Optional.empty();
+        }
+        // Hibernate 6 may map TIMESTAMPTZ as either java.sql.Timestamp or
+        // java.time.Instant depending on the JDBC driver path; handle both.
+        Object raw = rows.get(0);
+        Instant lockedUntil =
+                raw instanceof Instant i ? i : ((Timestamp) raw).toInstant();
+        if (lockedUntil.isAfter(Instant.now())) {
+            return Optional.of(lockedUntil);
+        }
+        // Expired — best-effort clear so the row doesn't carry stale state.
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users SET locked_until = NULL"
+                                + " WHERE id = :userId AND locked_until <= NOW()")
+                .setParameter("userId", userId.value())
+                .executeUpdate();
+        return Optional.empty();
+    }
+
+    /**
+     * Atomic failure-count + lockout decision in one SQL with CASE
+     * branches. The window-reset rule (last_fail_at older than 15 min →
+     * counter restarts at 1) is folded in so the counter never grows
+     * unboundedly. The lockout sets {@code locked_until = now + 15 min}
+     * once {@code failed_login_count + 1 >= 5} within the window.
+     */
+    @Override
+    @Transactional
+    public void recordLoginFailure(UserId userId, Instant now) {
+        Timestamp nowTs = Timestamp.from(now);
+        Timestamp windowOpen = Timestamp.from(now.minus(FAIL_WINDOW));
+        Timestamp lockUntil = Timestamp.from(now.plus(LOCK_DURATION));
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users"
+                                + " SET failed_login_count = CASE"
+                                + "       WHEN last_fail_at IS NULL OR last_fail_at < :windowOpen"
+                                + "         THEN 1"
+                                + "       ELSE failed_login_count + 1"
+                                + "     END,"
+                                + "     last_fail_at = :now,"
+                                + "     locked_until = CASE"
+                                + "       WHEN last_fail_at IS NOT NULL"
+                                + "         AND last_fail_at >= :windowOpen"
+                                + "         AND failed_login_count + 1 >= :threshold"
+                                + "         THEN :lockUntil"
+                                + "       ELSE locked_until"
+                                + "     END"
+                                + " WHERE id = :userId")
+                .setParameter("windowOpen", windowOpen)
+                .setParameter("now", nowTs)
+                .setParameter("threshold", LOCKOUT_THRESHOLD)
+                .setParameter("lockUntil", lockUntil)
+                .setParameter("userId", userId.value())
+                .executeUpdate();
+    }
+
+    @Override
+    @Transactional
+    public void recordLoginSuccess(UserId userId) {
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users"
+                                + " SET failed_login_count = 0,"
+                                + "     last_fail_at = NULL,"
+                                + "     locked_until = NULL"
+                                + " WHERE id = :userId")
+                .setParameter("userId", userId.value())
+                .executeUpdate();
+    }
+
+    @Override
+    @Transactional
+    public void unlock(UserId userId) {
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users"
+                                + " SET locked_until = NULL,"
+                                + "     failed_login_count = 0"
+                                + " WHERE id = :userId")
+                .setParameter("userId", userId.value())
+                .executeUpdate();
     }
 }

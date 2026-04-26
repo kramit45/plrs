@@ -1,5 +1,6 @@
 package com.plrs.domain.user;
 
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -71,4 +72,32 @@ public interface UserRepository {
      * keeps the API total without requiring an Optional.
      */
     long getSkillsVersion(UserId userId);
+
+    /**
+     * Reads {@code users.locked_until} for the FR-06 lock check. Returns
+     * empty when not locked OR when the lock has already expired (caller
+     * doesn't need to worry about the expiry gate). The adapter is
+     * expected to NULL-out an expired lock as a courtesy on read so the
+     * column doesn't carry stale state.
+     */
+    Optional<Instant> getLockedUntil(UserId userId);
+
+    /**
+     * Records one failed login attempt and applies the FR-06 lockout
+     * rule (≥ 5 failures within 15 min → set {@code locked_until = now +
+     * 15 min}). Implementation is a single SQL statement with CASE so
+     * the read-decide-write happens atomically — no application-side
+     * race window.
+     */
+    void recordLoginFailure(UserId userId, Instant now);
+
+    /**
+     * Resets the lockout state on a successful login: zero
+     * {@code failed_login_count}, NULL {@code last_fail_at} and
+     * {@code locked_until}.
+     */
+    void recordLoginSuccess(UserId userId);
+
+    /** ADMIN-only manual unlock: clears {@code locked_until} and the failure counter. */
+    void unlock(UserId userId);
 }

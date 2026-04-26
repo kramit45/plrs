@@ -9,6 +9,8 @@ import com.plrs.domain.user.BCryptHash;
 import com.plrs.domain.user.Email;
 import com.plrs.domain.user.User;
 import com.plrs.domain.user.UserRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -68,17 +70,20 @@ public class LoginUseCase {
     private final PasswordEncoder encoder;
     private final TokenService tokens;
     private final RefreshTokenStore refreshTokens;
+    private final Clock clock;
     private final BCryptHash dummyHash;
 
     public LoginUseCase(
             UserRepository users,
             PasswordEncoder encoder,
             TokenService tokens,
-            RefreshTokenStore refreshTokens) {
+            RefreshTokenStore refreshTokens,
+            Clock clock) {
         this.users = users;
         this.encoder = encoder;
         this.tokens = tokens;
         this.refreshTokens = refreshTokens;
+        this.clock = clock;
         this.dummyHash = BCryptHash.of(DUMMY_HASH_VALUE);
     }
 
@@ -96,11 +101,34 @@ public class LoginUseCase {
 
         Optional<User> maybeUser = users.findByEmail(email);
         User user = maybeUser.orElse(null);
+
+        // FR-06 lock check happens BEFORE the BCrypt comparison so a
+        // locked account never spends CPU on key derivation. Timing
+        // safety is preserved: the unknown-email path still runs
+        // BCrypt against the dummy hash below, so an attacker cannot
+        // distinguish "locked" from "wrong password" when the email
+        // is wrong (in that case the user object is null and we never
+        // reach this branch).
+        if (user != null) {
+            Optional<Instant> locked = users.getLockedUntil(user.id());
+            if (locked.isPresent()) {
+                throw new AccountLockedException(locked.get());
+            }
+        }
+
         BCryptHash hashToCheck = user != null ? user.passwordHash() : dummyHash;
         boolean matches = encoder.matches(rawPassword, hashToCheck);
         if (user == null || !matches) {
+            // Only count failures against known accounts — counting
+            // against unknown emails would let an attacker lock out
+            // arbitrary accounts they probe.
+            if (user != null) {
+                users.recordLoginFailure(user.id(), Instant.now(clock));
+            }
             throw new InvalidCredentialsException();
         }
+
+        users.recordLoginSuccess(user.id());
 
         IssuedTokens issued = tokens.issue(user.id(), user.roles());
         refreshTokens.store(issued.refreshJti(), user.id(), issued.refreshExpiresAt());

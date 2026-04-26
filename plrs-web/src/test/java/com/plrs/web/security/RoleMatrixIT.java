@@ -120,6 +120,7 @@ class RoleMatrixIT {
     @MockBean private SubmitQuizAttemptUseCase submitQuizAttemptUseCase;
     @MockBean private StudentDashboardService dashboardService;
     @MockBean private WeeklyActivityService weeklyActivityService;
+    @MockBean private com.plrs.domain.path.LearnerPathRepository learnerPathRepository;
 
     private static UUID newId() {
         return UUID.randomUUID();

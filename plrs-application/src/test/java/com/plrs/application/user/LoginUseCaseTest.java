@@ -20,7 +20,9 @@ import com.plrs.domain.user.Role;
 import com.plrs.domain.user.User;
 import com.plrs.domain.user.UserId;
 import com.plrs.domain.user.UserRepository;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -47,9 +49,11 @@ class LoginUseCaseTest {
 
     private LoginUseCase useCase;
 
+    private static final Clock FIXED = Clock.fixed(T0, ZoneOffset.UTC);
+
     @BeforeEach
     void setUp() {
-        useCase = new LoginUseCase(users, encoder, tokenService, refreshStore);
+        useCase = new LoginUseCase(users, encoder, tokenService, refreshStore, FIXED);
     }
 
     private static User storedUser(String email) {
@@ -67,9 +71,64 @@ class LoginUseCaseTest {
     }
 
     @Test
+    void lockedAccountThrowsBeforeBcrypt() {
+        User user = storedUser("kumar@example.com");
+        when(users.findByEmail(any())).thenReturn(Optional.of(user));
+        when(users.getLockedUntil(user.id()))
+                .thenReturn(Optional.of(T0.plusSeconds(600)));
+
+        assertThatThrownBy(
+                        () ->
+                                useCase.handle(
+                                        new LoginCommand("kumar@example.com", "Password01")))
+                .isInstanceOf(AccountLockedException.class);
+        verify(encoder, never()).matches(anyString(), any());
+        verify(refreshStore, never()).store(anyString(), any(), any());
+    }
+
+    @Test
+    void successResetsFailureCounter() {
+        User user = storedUser("kumar@example.com");
+        when(users.findByEmail(any())).thenReturn(Optional.of(user));
+        when(users.getLockedUntil(user.id())).thenReturn(Optional.empty());
+        when(encoder.matches(eq("Password01"), any())).thenReturn(true);
+        when(tokenService.issue(user.id(), user.roles())).thenReturn(stubTokens());
+
+        useCase.handle(new LoginCommand("kumar@example.com", "Password01"));
+
+        verify(users).recordLoginSuccess(user.id());
+        verify(users, never()).recordLoginFailure(any(), any());
+    }
+
+    @Test
+    void failedLoginRecordsFailureForKnownUser() {
+        User user = storedUser("kumar@example.com");
+        when(users.findByEmail(any())).thenReturn(Optional.of(user));
+        when(users.getLockedUntil(user.id())).thenReturn(Optional.empty());
+        when(encoder.matches(anyString(), any())).thenReturn(false);
+
+        assertThatThrownBy(
+                        () -> useCase.handle(new LoginCommand("kumar@example.com", "wrong")))
+                .isInstanceOf(InvalidCredentialsException.class);
+        verify(users).recordLoginFailure(user.id(), T0);
+    }
+
+    @Test
+    void unknownEmailDoesNotRecordFailure() {
+        when(users.findByEmail(any())).thenReturn(Optional.empty());
+        when(encoder.matches(anyString(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> useCase.handle(new LoginCommand("ghost@x.com", "pw")))
+                .isInstanceOf(InvalidCredentialsException.class);
+        // Don't let attackers lock arbitrary unknown emails.
+        verify(users, never()).recordLoginFailure(any(), any());
+    }
+
+    @Test
     void happyPathIssuesTokensAndStoresRefreshJti() {
         User user = storedUser("kumar@example.com");
         when(users.findByEmail(any())).thenReturn(Optional.of(user));
+        when(users.getLockedUntil(user.id())).thenReturn(Optional.empty());
         when(encoder.matches(eq("Password01"), any())).thenReturn(true);
         when(tokenService.issue(user.id(), user.roles())).thenReturn(stubTokens());
 

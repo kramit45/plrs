@@ -59,7 +59,11 @@ class UsersTableIT extends PostgresTestBase {
                 "updated_at",
                 "created_by",
                 // Added by V12 (step 88): user_skills_version powers cache busts.
-                "user_skills_version");
+                "user_skills_version",
+                // Added by V21 (step 153): FR-06 account-lockout columns.
+                "failed_login_count",
+                "last_fail_at",
+                "locked_until");
         assertThat(columns.get("id"))
                 .isEqualTo(new ColumnSpec("uuid", "NO", null));
         assertThat(columns.get("email"))
