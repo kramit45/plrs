@@ -27,6 +27,7 @@ import org.springframework.stereotype.Component;
 public class RedisRefreshTokenStore implements RefreshTokenStore {
 
     static final String KEY_PREFIX = "jwt:refresh:";
+    static final String USER_INDEX_PREFIX = "jwt:user-refresh:";
 
     private final StringRedisTemplate redis;
     private final Clock clock;
@@ -44,6 +45,13 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
                     "refresh token expiresAt (" + expiresAt + ") must be in the future");
         }
         redis.opsForValue().set(key(jti), userId.value().toString(), ttl);
+        // Reverse index for revokeAllForUser. Set TTL slightly longer
+        // than the per-jti TTL so the set survives every member;
+        // staleness is harmless because revoke iterates the set and
+        // deletes the (possibly already-evicted) per-jti key.
+        String userKey = userIndexKey(userId);
+        redis.opsForSet().add(userKey, jti);
+        redis.expire(userKey, ttl.plusSeconds(60));
     }
 
     @Override
@@ -55,9 +63,28 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
     @Override
     public void revoke(String jti) {
         redis.delete(key(jti));
+        // Best-effort: remove from any user-index set that mentions it.
+        // We don't have the userId here, so the entry stays in the set
+        // until the set TTL evicts it; revokeAllForUser tolerates that.
+    }
+
+    @Override
+    public void revokeAllForUser(UserId userId) {
+        String userKey = userIndexKey(userId);
+        java.util.Set<String> jtis = redis.opsForSet().members(userKey);
+        if (jtis != null) {
+            for (String jti : jtis) {
+                redis.delete(key(jti));
+            }
+        }
+        redis.delete(userKey);
     }
 
     private static String key(String jti) {
         return KEY_PREFIX + jti;
+    }
+
+    private static String userIndexKey(UserId userId) {
+        return USER_INDEX_PREFIX + userId.value();
     }
 }

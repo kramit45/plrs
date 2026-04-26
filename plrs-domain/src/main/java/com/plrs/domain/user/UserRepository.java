@@ -100,4 +100,27 @@ public interface UserRepository {
 
     /** ADMIN-only manual unlock: clears {@code locked_until} and the failure counter. */
     void unlock(UserId userId);
+
+    /**
+     * Stores a password-reset token + expiry on the user row. Replaces
+     * any prior token. Caller is responsible for token entropy
+     * (32 url-safe chars from a CSPRNG is the demo standard).
+     */
+    void setResetToken(UserId userId, String token, Instant expiresAt);
+
+    /**
+     * Looks up the user holding the given reset token. The adapter does
+     * NOT enforce expiry — the use case checks {@code reset_expires_at}
+     * via {@link #getResetExpiresAt} so the contract stays narrow.
+     */
+    Optional<User> findByResetToken(String token);
+
+    /** Reads the stored reset expiry — used by the confirm path's expiry check. */
+    Optional<Instant> getResetExpiresAt(UserId userId);
+
+    /** Clears the reset token and expiry. */
+    void clearResetToken(UserId userId);
+
+    /** Updates only the password hash — the confirm path. */
+    void updatePasswordHash(UserId userId, String bcryptHash);
 }

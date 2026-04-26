@@ -54,4 +54,12 @@ public interface RefreshTokenStore {
      * or already-revoked jti is a no-op.
      */
     void revoke(String jti);
+
+    /**
+     * Revokes every active jti tied to a user. Used by the FR-04
+     * password-reset confirm path so the old session can't survive a
+     * password change. Idempotent — a user with no active jtis is a
+     * no-op.
+     */
+    void revokeAllForUser(UserId userId);
 }

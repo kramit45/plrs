@@ -207,4 +207,73 @@ public class SpringDataUserRepository implements UserRepository {
                 .setParameter("userId", userId.value())
                 .executeUpdate();
     }
+
+    @Override
+    @Transactional
+    public void setResetToken(UserId userId, String token, Instant expiresAt) {
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users"
+                                + " SET reset_token = :token,"
+                                + "     reset_expires_at = :expiresAt"
+                                + " WHERE id = :userId")
+                .setParameter("token", token)
+                .setParameter("expiresAt", Timestamp.from(expiresAt))
+                .setParameter("userId", userId.value())
+                .executeUpdate();
+    }
+
+    @Override
+    public Optional<User> findByResetToken(String token) {
+        // Native lookup of user_id (reset_token isn't mapped on the JPA
+        // entity) followed by the regular findById hydration so the
+        // User aggregate carries roles + audit correctly.
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> rows =
+                em.createNativeQuery(
+                                "SELECT id FROM plrs_ops.users WHERE reset_token = :token")
+                        .setParameter("token", token)
+                        .getResultList();
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return Optional.empty();
+        }
+        java.util.UUID uid = (java.util.UUID) rows.get(0);
+        return findById(UserId.of(uid));
+    }
+
+    @Override
+    public Optional<Instant> getResetExpiresAt(UserId userId) {
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> rows =
+                em.createNativeQuery(
+                                "SELECT reset_expires_at FROM plrs_ops.users WHERE id = :userId")
+                        .setParameter("userId", userId.value())
+                        .getResultList();
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return Optional.empty();
+        }
+        Object raw = rows.get(0);
+        return Optional.of(raw instanceof Instant i ? i : ((Timestamp) raw).toInstant());
+    }
+
+    @Override
+    @Transactional
+    public void clearResetToken(UserId userId) {
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users"
+                                + " SET reset_token = NULL,"
+                                + "     reset_expires_at = NULL"
+                                + " WHERE id = :userId")
+                .setParameter("userId", userId.value())
+                .executeUpdate();
+    }
+
+    @Override
+    @Transactional
+    public void updatePasswordHash(UserId userId, String bcryptHash) {
+        em.createNativeQuery(
+                        "UPDATE plrs_ops.users SET password_hash = :hash WHERE id = :userId")
+                .setParameter("hash", bcryptHash)
+                .setParameter("userId", userId.value())
+                .executeUpdate();
+    }
 }

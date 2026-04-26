@@ -63,7 +63,10 @@ class UsersTableIT extends PostgresTestBase {
                 // Added by V21 (step 153): FR-06 account-lockout columns.
                 "failed_login_count",
                 "last_fail_at",
-                "locked_until");
+                "locked_until",
+                // Added by V22 (step 157): FR-04 password-reset columns.
+                "reset_token",
+                "reset_expires_at");
         assertThat(columns.get("id"))
                 .isEqualTo(new ColumnSpec("uuid", "NO", null));
         assertThat(columns.get("email"))
