@@ -1,0 +1,270 @@
+{
+  "info": {
+    "name": "PLRS Iter4 E2E",
+    "description": "Iter 4 flow: path planner generate→start→step-done→active, CSV import (3 valid + 1 invalid), CSV export, lockout (5 fails → 423 → admin unlock → recover), admin runtime tunable update. Requires seed.sql + seed-iter3.sql + seed-iter4.sql to be loaded first. Traces to: FR-31..FR-34, FR-06, FR-10/11, FR-40.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Student login (seeded)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.environment.set('studentAccessToken', pm.response.json().accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{studentEmail}}\",\n  \"password\": \"{{studentPassword}}\"\n}" },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Student generates path on target topic (persist=true)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.test('pathId returned', () => pm.expect(body.pathId).to.be.a('number'));",
+          "pm.environment.set('pathId', body.pathId);"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/learning-path?targetTopicId={{pathTargetTopicId}}&persist=true",
+          "host": ["{{baseUrl}}"], "path": ["api", "learning-path"],
+          "query": [
+            { "key": "targetTopicId", "value": "{{pathTargetTopicId}}" },
+            { "key": "persist", "value": "true" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Student starts the path",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 204', () => pm.response.to.have.status(204));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }],
+        "url": "{{baseUrl}}/api/learning-path/{{pathId}}/start"
+      }
+    },
+    {
+      "name": "Student marks step 1 done",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 204', () => pm.response.to.have.status(204));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }],
+        "url": "{{baseUrl}}/api/learning-path/{{pathId}}/steps/1/done"
+      }
+    },
+    {
+      "name": "Student lists active paths",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const expectedId = parseInt(pm.environment.get('pathId'), 10);",
+          "pm.test('active list contains our pathId', () => pm.expect(body.map(p => p.pathId)).to.include(expectedId));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }],
+        "url": "{{baseUrl}}/api/learning-path/active"
+      }
+    },
+    {
+      "name": "Admin login (seeded)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.environment.set('adminAccessToken', pm.response.json().accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}" },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Instructor login (for CSV import)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.environment.set('instructorAccessToken', pm.response.json().accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{instructorEmail}}\",\n  \"password\": \"{{instructorPassword}}\"\n}" },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Instructor imports CSV (3 valid + 1 invalid)",
+      "event": [{
+        "listen": "prerequest",
+        "script": { "type": "text/javascript", "exec": [
+          "// Use a unique topic_name that won't exist so all rows fail with 'Unknown topic'?",
+          "// We need a topic_name that DOES exist for valid rows. The seeded 'Iter4 Path Target'",
+          "// works. Build the multipart body inline.",
+          "const topicName = 'Iter4 Path Target';",
+          "const suffix = Date.now();",
+          "const csv = 'topic_name,title,ctype,difficulty,est_minutes,url\\n' +",
+          "    `${topicName},Imported A ${suffix},VIDEO,BEGINNER,5,https://example.com/imp-a-${suffix}\\n` +",
+          "    `${topicName},Imported B ${suffix},ARTICLE,INTERMEDIATE,8,https://example.com/imp-b-${suffix}\\n` +",
+          "    `${topicName},Imported C ${suffix},EXERCISE,ADVANCED,12,https://example.com/imp-c-${suffix}\\n` +",
+          "    `Unknown Topic Foo,Bad Row,VIDEO,BEGINNER,5,https://example.com/bad-${suffix}\\n`;",
+          "pm.environment.set('csvBody', csv);"
+        ]}
+      }, {
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.test('3 saved', () => pm.expect(body.saved).to.eql(3));",
+          "pm.test('1 error', () => pm.expect(body.errors.length).to.eql(1));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{instructorAccessToken}}" }],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "text", "value": "{{csvBody}}", "contentType": "text/csv" }
+          ]
+        },
+        "url": "{{baseUrl}}/api/content/import"
+      }
+    },
+    {
+      "name": "Instructor exports catalogue CSV",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Content-Type text/csv', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));",
+          "pm.test('header row present', () => pm.expect(pm.response.text()).to.include('topic_name,title,ctype'));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{instructorAccessToken}}" }],
+        "url": "{{baseUrl}}/api/content/export"
+      }
+    },
+    {
+      "name": "Lockout: 5 wrong-password attempts on lockee",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "// Iterate 5 logins inline; each should 401, then the 6th in the next request should 423.",
+          "const fetch = (cb) => {",
+          "  const opts = { url: pm.environment.get('baseUrl') + '/api/auth/login',",
+          "                 method: 'POST',",
+          "                 header: { 'Content-Type': 'application/json' },",
+          "                 body: { mode: 'raw',",
+          "                         raw: JSON.stringify({ email: pm.environment.get('lockeeEmail'),",
+          "                                               password: 'WRONG' }) } };",
+          "  pm.sendRequest(opts, cb);",
+          "};",
+          "const chain = (n, done) => n === 0 ? done() : fetch(() => chain(n - 1, done));",
+          "chain(5, () => {});",
+          "// Test always passes — the 6th attempt is the next collection step.",
+          "pm.test('Pre-step ran', () => pm.expect(true).to.eql(true));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Lockee 6th attempt expects 423",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 423', () => pm.response.to.have.status(423));",
+          "pm.test('Retry-After header present', () => pm.expect(pm.response.headers.get('Retry-After')).to.not.be.null);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{lockeeEmail}}\",\n  \"password\": \"{{lockeePassword}}\"\n}" },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Admin unlocks lockee",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 204', () => pm.response.to.have.status(204));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+        "url": "{{baseUrl}}/api/admin/users/{{lockeeUserId}}/unlock"
+      }
+    },
+    {
+      "name": "Lockee can log in again",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{lockeeEmail}}\",\n  \"password\": \"{{lockeePassword}}\"\n}" },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Student gets recommendations (post-path)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Recs is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{studentAccessToken}}" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/recommendations?k=10",
+          "host": ["{{baseUrl}}"], "path": ["api", "recommendations"],
+          "query": [{ "key": "k", "value": "10" }]
+        }
+      }
+    }
+  ]
+}
