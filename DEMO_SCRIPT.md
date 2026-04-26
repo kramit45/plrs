@@ -1,4 +1,4 @@
-# PLRS — Iteration 2 demo script
+# PLRS — Iteration 3 demo script
 
 Step-by-step walkthrough for the MCSP-232 viva. Every command below
 is copy-paste runnable from the repository root, given the listed
@@ -14,19 +14,29 @@ prerequisites.
 ## 1. Boot the stack
 
 ```bash
-# Postgres + Redis
-docker run -d --name plrs-pg -p 5432:5432 \
-    -e POSTGRES_DB=plrs -e POSTGRES_USER=plrs -e POSTGRES_PASSWORD=plrs \
-    postgres:15-alpine
-docker run -d --name plrs-redis -p 6379:6379 redis:7-alpine
+# Whole supporting stack: Postgres + Redis + plrs-ml + Kafka + plrs-etl-worker.
+PLRS_ML_HMAC_SECRET=dev-secret docker compose up -d
 
-# Application — Flyway migrates V1..V13 on first boot.
+# Confirm all five services are up.
+docker compose ps
+```
+
+Expected `STATUS` column for each row: `Up (healthy)` for `postgres`,
+`redis`, `kafka`; `Up` for `plrs-ml` and `plrs-etl-worker`.
+
+```bash
+# Application — Flyway migrates V1..V17 on first boot.
+PLRS_KAFKA_ENABLED=true \
+PLRS_KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+PLRS_ML_BASE_URL=http://localhost:8000 \
+PLRS_ML_HMAC_SECRET=dev-secret \
 mvn -pl plrs-web spring-boot:run
 ```
 
 Watch the log for `Started PlrsApplication in <n> seconds`. Visit
 `http://localhost:8080/health` — should return 200 with
-`{"status":"UP"}`.
+`{"status":"UP"}`. Also check `curl http://localhost:8000/health` for
+the Python ML service: 200 `{"status":"ok"}`.
 
 ## 2. Load the demo seed
 
@@ -165,9 +175,79 @@ After `mvn verify`:
   the multi-module JaCoCo merge has been enabled in your local pom
   override.
 
+## 8. Iter 3 — recommender, warehouse, admin eval
+
+### 8a. Student sees a fresh recommendation slate after a quiz
+
+1. Still logged in as the student from §4, return to `/dashboard`.
+2. The **Recommended for you** card lists up to ten items. Cold-start
+   shows popularity-blended BEGINNER content; right after the §4
+   quiz attempt, the post-mastery slate refreshes (the version-bust
+   path nukes `rec:topN:{userUuid}` in Redis).
+3. Hover the **Why?** badge on any row — the `RecommendationReason`
+   string explains which signal dominated (CF neighbour, CB
+   topic-similarity, popularity).
+
+### 8b. Admin runs the offline evaluation
+
+1. Open `/admin` (logged in as an ADMIN — promote a user via
+   `INSERT INTO plrs_ops.user_roles … 'ADMIN'` if needed).
+2. Click **Run Evaluation**. The card POSTs to
+   `/api/admin/eval/run`, which proxies to the Python `/eval/run`
+   endpoint and persists a row in `plrs_dw.fact_eval_run`.
+3. The card renders the three numbers: **precision@10**,
+   **ndcg@10**, **coverage**.
+
+### 8c. Warehouse fact rows flow through Kafka
+
+```bash
+PGPASSWORD=plrs psql -h localhost -U plrs -d plrs <<'SQL'
+-- Interactions consumed off plrs.interactions by plrs-etl-worker.
+SELECT user_id, content_id, event_type, occurred_at
+FROM plrs_dw.fact_interaction
+ORDER BY occurred_at DESC
+LIMIT 5;
+
+-- Eval runs persisted by /api/admin/eval/run.
+SELECT eval_run_id, ran_at, precision_at_10, ndcg_at_10, coverage
+FROM plrs_dw.fact_eval_run
+ORDER BY ran_at DESC
+LIMIT 3;
+SQL
+```
+
+The fact_interaction rows are populated by the ETL worker after the
+beacon writes traverse the outbox → Kafka → consumer → warehouse
+path; expect a few seconds of delay between the catalogue
+view-beacon firing and the row landing.
+
+### 8d. NFR-11: ML service can fail without taking the JVM down
+
+```bash
+# Stop only the Python ML service.
+docker compose stop plrs-ml
+
+# Refresh /dashboard in the browser. The Recommended-for-you card
+# still populates — composite scorers fall back to the in-process
+# popularity + sim-slab path. The dashboard never errors.
+
+# Bring it back.
+docker compose start plrs-ml
+
+# Refresh again. Recommendations resume the ML-backed slate; admin
+# /admin Run Evaluation is functional again (eval requires the
+# Python service since it owns the slate computation).
+```
+
+The fallback toggle is `plrs.ml.base-url`: when unreachable, both
+`CompositeCfScorer` and `CompositeCbScorer` swallow the failure and
+return their in-process result, while `RunEvalUseCase` is gated off
+since precision@10 / ndcg@10 / coverage requires the slate the
+Python service computes.
+
 ## Stopping the demo
 
 ```bash
 # Ctrl-C the spring-boot:run terminal, then:
-docker rm -f plrs-pg plrs-redis
+docker compose down
 ```

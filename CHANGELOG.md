@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [0.3.0] — Iteration 3 — 2026-04-26
+
+The third iteration delivers the recommender pipeline (CF + CB +
+hybrid blend + MMR), an external Python ML microservice, a Kafka
+producer + ETL worker, the minimum `plrs_dw` warehouse star, and the
+offline evaluation harness with an admin trigger surface. 41 commits
+on `main`, all green in CI.
+
+### Features — domain
+
+- `6edac3c` feat(domain): add RecommendationScore and RecommendationReason VOs
+- `157178c` feat(domain): add Recommendation aggregate
+- `1ee5da4` feat(domain): add RecommendationRepository port
+
+### Features — application
+
+- `31249cb` feat(application): add PopularityScorer over recent interactions
+- `cc560e8` feat(application): RecommendationService skeleton with popularity scoring + prereq + feasibility filters
+- `98dafd0` feat(application): GenerateRecommendationsUseCase with version-aware Redis cache
+- `62eaf57` feat(application): add CfScorer with Redis sim slab + artifact fallback
+- `a8bea3d` feat(application): integrate CfScorer into RecommendationService with cf_v1 variant
+- `502dde7` test(application): add CF golden-data fixture with hand-computed expected ranking
+- `71e45ac` feat(application): add CbScorer using TF-IDF centroid cosine
+- `3aad023` feat(application): add HybridRanker with λ=0.65 blend and cold-start fallback
+- `9824468` feat(application): add MmrReranker for diversity-aware reranking
+- `831ed07` feat(application): add ExplanationTemplate with deterministic per-signal reasons
+- `2a09250` test(application): add full-pipeline hybrid + MMR golden test
+- `a15c18c` feat(java): add MlServiceClient with HMAC signing, retry, and timeout
+- `46ab178` feat(application): route CF and CB scoring through ML service with in-process fallback (NFR-11)
+
+### Features — infrastructure
+
+- `003570e` feat(infra): add flyway v14 recommendations table
+- `117623c` feat(infra): add SpringDataRecommendationRepository adapter
+- `6451242` feat(infra): add nightly ItemSimilarityJob writing item-item cosine to Redis
+- `7764f25` feat(infra): add flyway v15 model_artifacts and ArtifactRepository
+- `2c7d815` feat(infra): add TfIdfBuildJob computing and storing TF-IDF for catalogue
+- `eb5c96b` feat(infra): add KafkaOutboxPublisher conditional on plrs.kafka.enabled
+- `f06aca4` feat(infra): add Kafka Testcontainers IT verifying outbox-to-topic flow
+- `fd34d07` feat(infra): add flyway v16 minimum warehouse (dim_date, dim_user, dim_content, dim_topic, fact_interaction)
+
+### Features — web
+
+- `e3c281f` feat(web): GET /api/recommendations with k validation and per-user rate limit
+- `6e95599` feat(web): add Recommended-for-you card to student dashboard
+- `a540d83` feat(web): include score breakdown in recommendation response for ADMIN
+- `bee1285` feat(infra+web): add fact_eval_run table and POST /api/admin/eval/run admin endpoint
+- `be592c0` feat(web): add /admin home page with Run Evaluation tile
+
+### Features — Python ML service (plrs-ml)
+
+- `e110f1a` chore(plrs-ml): bootstrap FastAPI project with poetry, ruff, pytest
+- `f07134e` feat(plrs-ml): add /health endpoint, Dockerfile, and docker-compose service
+- `bc1566c` feat(plrs-ml): add scikit + implicit + ops_db client and Redis cache helper
+- `9ff3883` feat(plrs-ml): add POST /features/rebuild computing TF-IDF over content
+- `bcf69e9` feat(plrs-ml): add POST /cf/recompute using implicit CosineRecommender
+- `fc310fa` feat(plrs-ml): add GET /cf/similar and /cb/similar with HMAC signature middleware
+- `7d5e0c5` feat(plrs-ml): add POST /eval/run computing precision@10, ndcg@10, coverage
+
+### Features — ETL worker (plrs-etl-worker)
+
+- `9dbd624` feat(plrs-etl-worker): bootstrap Kafka consumer writing to fact_interaction with idempotent upserts
+
+### Tests — e2e
+
+- `975342e` test(e2e): Newman Iter 3 flow + admin recompute trigger endpoint
+- `202c9de` test(e2e): Playwright verifying recommendations refresh after quiz attempt
+
+### Chore and docs
+
+- `c006988` chore: ignore .jqwik-database local cache
+- `c4d877e` docs: save remaining Iter 3 step prompts (139, 140) for resumption
+- (this commit) docs: iteration 3 readme, changelog, and demo script
+
 ## [0.2.0] — Iteration 2 — 2026-04-25
 
 The second iteration delivers the catalogue, interaction tracking,
