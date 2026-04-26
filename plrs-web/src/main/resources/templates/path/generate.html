@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <h1 class="h3 mb-3">Generate a learning path</h1>
+    <p class="text-muted mb-4">
+        Pick the topic you want to master. PLRS will plan the prerequisite
+        chain and skip anything you've already mastered.
+    </p>
+
+    <form th:action="@{/path/generate}" method="post" class="card shadow-sm">
+        <div class="card-body">
+            <input type="hidden" th:if="${_csrf != null}"
+                   th:name="${_csrf.parameterName}"
+                   th:value="${_csrf.token}"/>
+
+            <div class="mb-3">
+                <label for="targetTopicId" class="form-label">Target topic</label>
+                <select id="targetTopicId" name="targetTopicId" class="form-select" required>
+                    <option value="" disabled selected>— pick one —</option>
+                    <option th:each="t : ${topics}"
+                            th:value="${t.id().value()}"
+                            th:text="${t.name()}">topic</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Plan path</button>
+            <a th:href="@{/dashboard}" class="btn btn-link">Cancel</a>
+        </div>
+    </form>
+</div>
+</body>
+</html>

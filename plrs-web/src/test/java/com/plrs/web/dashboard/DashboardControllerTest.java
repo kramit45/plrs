@@ -58,6 +58,8 @@ class DashboardControllerTest {
 
     @MockBean private StudentDashboardService service;
     @MockBean private TokenService tokenService;
+    @MockBean private com.plrs.domain.path.LearnerPathRepository pathRepository;
+    @MockBean private com.plrs.domain.content.ContentRepository contentRepository;
 
     private static StudentDashboardView populatedView() {
         return new StudentDashboardView(

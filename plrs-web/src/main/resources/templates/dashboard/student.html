@@ -6,6 +6,57 @@
     <h1 class="h3 mb-4">Your dashboard</h1>
 
     <div class="row g-3">
+        <div class="col-12" th:if="${activePaths != null and !activePaths.isEmpty()}"
+             id="active-path-card-wrap">
+            <div class="card shadow-sm" id="active-path-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Your active learning path</h2>
+                    <div th:each="p : ${activePaths}" class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong>
+                                <a th:href="@{/path/{id}(id=${p.pathId()})}"
+                                   th:text="|Path #${p.pathId()} (${p.status()})|">
+                                    Path #1
+                                </a>
+                            </strong>
+                            <span class="text-muted small"
+                                  th:text="|${p.completedSteps()} / ${p.totalSteps()} done|">0 / 0 done</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar"
+                                 role="progressbar"
+                                 th:style="|width: ${p.totalSteps() == 0 ? 0 : (p.completedSteps() * 100 / p.totalSteps())}%|">
+                            </div>
+                        </div>
+                        <div class="text-muted small mt-1"
+                             th:if="${p.nextStepTitle() != null}"
+                             th:text="|Up next: ${p.nextStepTitle()}|">
+                            Up next: ...
+                        </div>
+                    </div>
+                    <a th:href="@{/path/generate}" class="btn btn-sm btn-outline-primary">
+                        Generate another path
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" th:if="${activePaths == null or activePaths.isEmpty()}"
+             id="no-active-path-card-wrap">
+            <div class="card shadow-sm" id="no-active-path-card">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Your learning path</h2>
+                    <p class="text-muted small mb-2">
+                        You don't have an active path yet. Pick a target topic
+                        to plan one.
+                    </p>
+                    <a th:href="@{/path/generate}" class="btn btn-sm btn-primary">
+                        Generate a path
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12">
             <div class="card shadow-sm" id="recommendations-card">
                 <div class="card-body">

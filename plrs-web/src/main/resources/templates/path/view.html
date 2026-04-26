@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::content})}">
+<body>
+<div th:fragment="content">
+    <p class="mb-3">
+        <a th:href="@{/dashboard}" class="link-secondary">&larr; Back to dashboard</a>
+    </p>
+
+    <h1 class="h3 mb-1">
+        Learning path:
+        <span th:text="${targetTopicName}">Target Topic</span>
+    </h1>
+    <p class="text-muted mb-4">
+        Status:
+        <span class="badge bg-secondary" th:text="${path.status()}">STATUS</span>
+        ·
+        <span th:text="${path.steps().size()}">0</span> step(s)
+    </p>
+
+    <div class="list-group" id="path-steps">
+        <div class="list-group-item d-flex justify-content-between align-items-center"
+             th:each="s : ${path.steps()}">
+            <div>
+                <strong>
+                    <span th:text="${s.stepOrder()}">1</span>.
+                    <span th:text="${s.title()}">Content title</span>
+                </strong>
+                <div class="text-muted small" th:text="${s.reasonInPath()}">reason</div>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="badge me-2"
+                      th:classappend="${s.status() == 'DONE'} ? 'bg-success'
+                                    : (${s.status() == 'IN_PROGRESS'} ? 'bg-primary'
+                                    : (${s.status() == 'SKIPPED'} ? 'bg-warning text-dark'
+                                    : 'bg-light text-dark border'))"
+                      th:text="${s.status()}">PENDING</span>
+                <form th:if="${s.status() == 'PENDING'}"
+                      th:action="@{/path/{id}/steps/{n}/done(id=${path.pathId()},n=${s.stepOrder()})}"
+                      method="post" class="d-inline">
+                    <input type="hidden" th:if="${_csrf != null}"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                        Mark done
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -5,8 +5,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.plrs.application.dashboard.MasteryByTopic;
 import com.plrs.application.dashboard.StudentDashboardService;
 import com.plrs.application.dashboard.StudentDashboardView;
+import com.plrs.domain.content.Content;
+import com.plrs.domain.content.ContentId;
+import com.plrs.domain.content.ContentRepository;
+import com.plrs.domain.path.LearnerPath;
+import com.plrs.domain.path.LearnerPathRepository;
 import com.plrs.domain.user.UserId;
+import com.plrs.web.path.LearningPathSummary;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,10 +51,18 @@ public class DashboardController {
 
     private final StudentDashboardService service;
     private final ObjectMapper objectMapper;
+    private final LearnerPathRepository pathRepository;
+    private final ContentRepository contentRepository;
 
-    public DashboardController(StudentDashboardService service, ObjectMapper objectMapper) {
+    public DashboardController(
+            StudentDashboardService service,
+            ObjectMapper objectMapper,
+            LearnerPathRepository pathRepository,
+            ContentRepository contentRepository) {
         this.service = service;
         this.objectMapper = objectMapper;
+        this.pathRepository = pathRepository;
+        this.contentRepository = contentRepository;
     }
 
     @GetMapping("/dashboard")
@@ -65,7 +83,24 @@ public class DashboardController {
         // so we serialise once on the server side.
         model.addAttribute("masteryLabelsJson", writeJsonOrEmpty(labels));
         model.addAttribute("masteryValuesJson", writeJsonOrEmpty(values));
+        model.addAttribute("activePaths", loadActivePathSummaries(userId));
         return "dashboard/student";
+    }
+
+    private List<LearningPathSummary> loadActivePathSummaries(UserId userId) {
+        List<LearnerPath> recent = pathRepository.findRecentByUser(userId, 10);
+        List<LearnerPath> active = recent.stream().filter(p -> p.status().isActive()).toList();
+        if (active.isEmpty()) {
+            return List.of();
+        }
+        Set<ContentId> ids = new HashSet<>();
+        active.forEach(p -> p.steps().forEach(s -> ids.add(s.contentId())));
+        Map<ContentId, String> titles = new HashMap<>();
+        for (ContentId cid : ids) {
+            Content c = contentRepository.findById(cid).orElse(null);
+            titles.put(cid, c != null ? c.title() : "(unknown)");
+        }
+        return active.stream().map(p -> LearningPathSummary.from(p, titles)).toList();
     }
 
     private String writeJsonOrEmpty(Object value) {
