@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
+## [1.0.0] — Submission Release — 2026-04-30
+
+The IGNOU MCSP-232 submission cut. Iteration 5 closes out everything
+needed to defend the project to the evaluator: NFR verification
+artefacts (perf + chaos + backup + integrity), live API and Javadoc
+sites, the deployment + architecture + status documents, the consolidated
+regression suites that run in CI, and the bias guardrail metrics
+(diversity + novelty) on the offline eval.
+
+Highlights across all five iterations:
+
+- **Iter 1 (auth + web)** — JWT API + form-login web, RS256 JWT,
+  Redis refresh-token allow-list, registration / login / me / logout.
+- **Iter 2 (catalog + interactions)** — content authoring, tsvector
+  search (FR-13), VIEW debounce (FR-15), quiz authoring + scoring,
+  mastery-radar dashboard.
+- **Iter 3 (recommender + warehouse)** — hybrid CF + content + popularity
+  scorer, MMR re-ranking, feasibility filter, cache-bust on quiz,
+  offline-eval harness (precision/nDCG/coverage), ML-down fallback.
+- **Iter 4 (paths + admin + RBAC)** — path planner (A6), KPI dashboard,
+  account lockout, CSV import/export, audit log viewer, runtime
+  tunables, integrity checks job.
+- **Iter 5 (NFR + docs + release)** — JMeter perf baseline, four chaos
+  scripts (NFR-9 + NFR-11), backup + restore-verify, three runbooks,
+  consolidated Newman + Playwright regression, OpenAPI + Javadoc +
+  pdoc sites, deployment / architecture / project-status docs,
+  diversity + novelty in eval, v1.0.0 submission package.
+
+## [0.5.0] — Iteration 5 — 2026-04-26
+
+Closes out NFR verification, documentation, and the v1.0.0 submission
+artefacts. 10 commits on `main`.
+
+### NFR verification
+
+- `4fbf4ce` test(perf): JMeter `/api/recommendations` plan + `RecommendationsLatencyIT` (p95 = 90 ms vs 500 ms ceiling)
+- `6507ccd` test(chaos): scripts verifying NFR-11 graceful degradation for ML, Redis, Kafka
+- `d3e687e` test(chaos): postgres_restart verifying NFR-9 30 s recovery via Hikari retry
+- `8a2423c` ops: pg_dump backup + restore-verify scripts and three runbooks (RB-1 / RB-2 / RB-3)
+
+### Regression + CI
+
+- `1671b00` test(newman): consolidated full-regression collection across all 4 iters (45 requests, 4 folders)
+- `b91332c` test(e2e): consolidated Playwright regression suite covering all iterations
+
+### Documentation
+
+- `406c4cf` docs: SpringDoc OpenAPI + Swagger UI + aggregated Javadoc + pdoc for Python
+- `383b0d2` docs: deployment guide, architecture diagram, project status matrix
+
+### Bias guardrails
+
+- `73fde1a` feat(infra): add diversity + novelty to offline eval per NFR-35
+
+### Submission release
+
+- `[this commit]` docs: v1.0.0 submission release with final README, CHANGELOG, SUBMISSION.md, build script
+
 ## [0.4.0] — Iteration 4 — 2026-04-26
 
 The fourth iteration delivers the FR-31 path planner, FR-36 admin

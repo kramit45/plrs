@@ -1,6 +1,18 @@
 # PLRS — Personalized Learning Recommendation System
 
 [![build](https://github.com/kramit45/plrs/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/kramit45/plrs/actions/workflows/build.yml)
+[![version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/kramit45/plrs/releases/tag/v1.0.0)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![IGNOU](https://img.shields.io/badge/IGNOU-MCSP--232-orange.svg)](docs/PROJECT_STATUS.md)
+
+> **Project metadata**
+> - **Title:** PLRS — Personalized Learning Recommendation System
+> - **Course:** IGNOU MCA (MCAOL) MCSP-232
+> - **Enrolment:** 2452345135
+> - **Guide:** Himanshu Katiyar
+> - **Regional Centre:** RC Ranchi
+> - **Synopsis approved:** 30-Nov-2025
+> - **Submission:** 30-Apr-2026
 
 PLRS is the capstone project submitted for **IGNOU MCA course MCSP-232**.
 It explores a recommendation system that tailors learning resources to
@@ -10,22 +22,43 @@ into a single deployable Java application.
 
 ## Status
 
-**Iteration 4 complete — paths, admin dashboard, security hardening.**
-Building on the Iter 3 recommender + warehouse, Iter 4 adds FR-31
-prerequisite-aware learner paths (planner + REST + Thymeleaf views +
-dashboard card), the FR-36 admin KPI dashboard backed by six
-`plrs_dw` materialised views (with a scheduled refresh job and
-direct `fact_recommendation` writes on serve so the views see data),
-FR-06 account lockout (5 failures / 15 min → 423), per-IP rate
-limiting on `/api/auth/login`, FR-04 password-reset (request +
-confirm REST endpoints with refresh-token revocation on confirm),
-FR-10/11 CSV bulk import + export for content, an FR-42 admin audit
-log viewer, FR-40 runtime-tunable parameters editable from
-`/admin/config` (with `@Cacheable` reads + `@CacheEvict` on update,
-wired into `HybridRanker` / `MmrReranker` / `PathPlanner`), a
-nightly integrity-checks job (DAG cycle + orphan rows + mastery
-bounds + version monotonicity), and a CSP tightening pass that
-externalised every remaining inline `<script>`.
+**v1.0.0 — submission release.** All five iterations closed; tagged
+`v1.0.0` for IGNOU evaluation.
+
+Quick links: [Architecture](docs/ARCHITECTURE.md) ·
+[Deployment](docs/DEPLOYMENT.md) ·
+[Demo Script](DEMO_SCRIPT.md) ·
+[Project Status](docs/PROJECT_STATUS.md) ·
+[Submission](SUBMISSION.md) ·
+[API docs](http://localhost:8080/swagger-ui.html) (live) ·
+[Javadoc](docs/javadoc/) (regenerate via `mvn javadoc:aggregate`)
+
+### Feature highlights
+
+- **Hybrid recommender** — collaborative filtering + content-based
+  TF-IDF + popularity, MMR-reranked, with feasibility gating on
+  per-topic mastery and live cache-bust on quiz events.
+- **EWMA mastery model** — server-authoritative quiz scoring updates
+  per-topic mastery snapshots inside one TX (TX-01) with outbox
+  publishing for the warehouse pipeline.
+- **Path planner** — prerequisite-aware DAG topo-sort (algorithm A6)
+  with persisted learner paths, step-status tracking, and a dashboard
+  active-path card.
+- **Admin dashboards** — six KPI tiles backed by `plrs_dw` MVs,
+  audit log viewer, runtime tunables (FR-40), CSV import/export,
+  triggered offline-eval with diversity + novelty (NFR-35).
+- **Security + ops** — full `@PreAuthorize` RBAC, per-IP + per-user
+  rate limits, account lockout, CSP without `unsafe-inline`,
+  three NFR-11 chaos scripts (ML/Redis/Kafka), NFR-9 Postgres-restart
+  recovery test, pg_dump backup + restore-verify, three runbooks.
+
+### Testing summary
+
+- ~280 unit + integration tests (Maven `verify`)
+- 45-request Newman regression across 4 iter folders + per-iter runs
+- Playwright E2E (per-iter classes + consolidated `FullRegressionE2E`)
+- JMeter latency baseline (`/api/recommendations` p95 = 90 ms observed)
+- 4 chaos scripts verifying NFR-9 + NFR-11 graceful degradation
 
 ## Prerequisites
 
