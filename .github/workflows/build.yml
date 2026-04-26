@@ -242,3 +242,79 @@ jobs:
           if [ -n "${APP_PID:-}" ]; then
             kill "$APP_PID" || true
           fi
+
+  playwright-full-regression:
+    # Long-running consolidated Playwright E2E. Runs the
+    # FullRegressionE2E suite under E2E=true, which downloads Chromium
+    # on first invocation (~150 MB) and walks every Iter 1..4 browser
+    # flow in one JVM. Skipped on PRs (Newman is the PR gate); only
+    # fires on direct pushes to main.
+    name: playwright full regression (push to main only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: plrs
+          POSTGRES_USER: plrs
+          POSTGRES_PASSWORD: plrs
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plrs -d plrs"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/plrs
+      DB_USER: plrs
+      DB_PASS: plrs
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      PLRS_JWT_GENERATE_IF_MISSING: 'true'
+      E2E: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium
+
+      - name: Run FullRegressionE2E
+        run: |
+          mvn -B -ntp -pl plrs-web -am verify \
+              -Dtest='FullRegressionE2E' \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dfailsafe.failIfNoSpecifiedTests=false
+
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: 'plrs-web/target/playwright-traces/**'
+          if-no-files-found: ignore
