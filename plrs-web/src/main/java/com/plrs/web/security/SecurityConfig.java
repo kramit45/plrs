@@ -61,6 +61,8 @@ public class SecurityConfig {
     public SecurityFilterChain apiChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtFilter,
+            org.springframework.beans.factory.ObjectProvider<LoginRateLimitFilter>
+                            loginRateLimitFilterProvider,
             CorsConfigurationSource corsSource)
             throws Exception {
         http.securityMatcher("/api/**")
@@ -73,8 +75,16 @@ public class SecurityConfig {
                                 a.requestMatchers("/api/auth/register", "/api/auth/login")
                                         .permitAll()
                                         .anyRequest()
-                                        .authenticated())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                                        .authenticated());
+        // Per-IP rate limit on /api/auth/login runs BEFORE the JWT
+        // filter so 429s short-circuit any auth work (NFR-31, step 154).
+        // Resolved via ObjectProvider because IpRateLimiter is gated on
+        // spring.datasource.url; no-DB slice tests boot without it.
+        LoginRateLimitFilter loginRateLimitFilter = loginRateLimitFilterProvider.getIfAvailable();
+        if (loginRateLimitFilter != null) {
+            http.addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(
                         e ->
                                 e.authenticationEntryPoint(
