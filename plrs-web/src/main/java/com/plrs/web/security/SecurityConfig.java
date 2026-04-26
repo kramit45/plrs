@@ -157,6 +157,9 @@ public class SecurityConfig {
                                                 "Permissions-Policy",
                                                 "geolocation=(), microphone=(), camera=(),"
                                                         + " payment=()"))
+                                .addHeaderWriter(
+                                        new StaticHeadersWriter(
+                                                "X-Robots-Tag", "noindex, nofollow"))
                                 .contentSecurityPolicy(
                                         csp ->
                                                 csp.policyDirectives(
