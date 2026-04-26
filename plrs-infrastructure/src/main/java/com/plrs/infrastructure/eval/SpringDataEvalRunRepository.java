@@ -31,6 +31,8 @@ public class SpringDataEvalRunRepository implements EvalRunRepository {
         row.setPrecisionAtK(run.precisionAtK().orElse(null));
         row.setNdcgAtK(run.ndcgAtK().orElse(null));
         row.setCoverage(run.coverage().orElse(null));
+        row.setDiversity(run.diversity().orElse(null));
+        row.setNovelty(run.novelty().orElse(null));
         row.setNUsers(run.nUsers().orElse(null));
         EvalRunRow saved = jpa.save(row);
         return toDomain(saved);
@@ -51,6 +53,8 @@ public class SpringDataEvalRunRepository implements EvalRunRepository {
                 Optional.ofNullable(row.getPrecisionAtK()),
                 Optional.ofNullable(row.getNdcgAtK()),
                 Optional.ofNullable(row.getCoverage()),
+                Optional.ofNullable(row.getDiversity()),
+                Optional.ofNullable(row.getNovelty()),
                 Optional.ofNullable(row.getNUsers()));
     }
 }

@@ -53,6 +53,8 @@ class SpringDataEvalRunRepositoryIT extends PostgresTestBase {
                         Optional.of(new BigDecimal("0.4500")),
                         Optional.of(new BigDecimal("0.5500")),
                         Optional.of(new BigDecimal("0.3000")),
+                        Optional.of(new BigDecimal("0.6500")),
+                        Optional.of(new BigDecimal("2.5000")),
                         Optional.of(12));
 
         EvalRun saved = repository.save(fresh);
@@ -63,6 +65,8 @@ class SpringDataEvalRunRepositoryIT extends PostgresTestBase {
         assertThat(saved.variantName()).isEqualTo("hybrid_v1");
         assertThat(saved.k()).isEqualTo((short) 10);
         assertThat(saved.precisionAtK()).hasValue(new BigDecimal("0.4500"));
+        assertThat(saved.diversity()).hasValue(new BigDecimal("0.6500"));
+        assertThat(saved.novelty()).hasValue(new BigDecimal("2.5000"));
         assertThat(saved.nUsers()).contains(12);
     }
 
@@ -79,6 +83,8 @@ class SpringDataEvalRunRepositoryIT extends PostgresTestBase {
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
                         Optional.empty()));
         repository.save(
                 new EvalRun(
@@ -87,6 +93,8 @@ class SpringDataEvalRunRepositoryIT extends PostgresTestBase {
                         "hybrid_v1",
                         (short) 10,
                         Optional.of(new BigDecimal("0.7000")),
+                        Optional.empty(),
+                        Optional.empty(),
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty()));

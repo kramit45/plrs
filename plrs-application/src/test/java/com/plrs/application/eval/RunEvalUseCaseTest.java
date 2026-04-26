@@ -34,6 +34,8 @@ class RunEvalUseCaseTest {
                         Optional.of(0.5),
                         Optional.of(0.6),
                         Optional.of(0.3),
+                        Optional.of(0.42),
+                        Optional.of(2.5),
                         Optional.of(7),
                         ranAt,
                         Optional.empty());
@@ -51,6 +53,8 @@ class RunEvalUseCaseTest {
                                     in.precisionAtK(),
                                     in.ndcgAtK(),
                                     in.coverage(),
+                                    in.diversity(),
+                                    in.novelty(),
                                     in.nUsers());
                         });
 
@@ -78,6 +82,8 @@ class RunEvalUseCaseTest {
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
                         ranAt,
                         Optional.of("no interactions"));
         when(ml.runEval(anyString(), anyInt())).thenReturn(skipped);
@@ -93,6 +99,8 @@ class RunEvalUseCaseTest {
                                     in.precisionAtK(),
                                     in.ndcgAtK(),
                                     in.coverage(),
+                                    in.diversity(),
+                                    in.novelty(),
                                     in.nUsers());
                         });
 

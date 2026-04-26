@@ -79,6 +79,8 @@ def test_run_eval_returns_metrics_shape_for_seeded_history():
         "precision_at_k",
         "ndcg_at_k",
         "coverage",
+        "diversity",
+        "novelty",
         "n_users",
         "ran_at",
         "variant",
@@ -88,5 +90,7 @@ def test_run_eval_returns_metrics_shape_for_seeded_history():
     assert out["precision_at_k"] >= 0.0
     assert out["ndcg_at_k"] >= 0.0
     assert 0.0 <= out["coverage"] <= 1.0
+    assert 0.0 <= out["diversity"] <= 1.0
+    assert out["novelty"] >= 0.0
     assert out["k"] == 5
     assert out["variant"] == "hybrid_v1"

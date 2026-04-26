@@ -8,7 +8,8 @@ import java.time.Instant;
 /**
  * REST DTO for an eval-run record. {@code Optional} fields collapse
  * to {@code null} (and Jackson omits them) so the JSON stays clean
- * for both OK and SKIPPED runs.
+ * for both OK and SKIPPED runs. {@code diversity} + {@code novelty}
+ * were added by step 174 / V25 (NFR-35).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record EvalRunResponse(
@@ -19,6 +20,8 @@ public record EvalRunResponse(
         BigDecimal precisionAtK,
         BigDecimal ndcgAtK,
         BigDecimal coverage,
+        BigDecimal diversity,
+        BigDecimal novelty,
         Integer nUsers) {
 
     public static EvalRunResponse from(EvalRun run) {
@@ -30,6 +33,8 @@ public record EvalRunResponse(
                 run.precisionAtK().orElse(null),
                 run.ndcgAtK().orElse(null),
                 run.coverage().orElse(null),
+                run.diversity().orElse(null),
+                run.novelty().orElse(null),
                 run.nUsers().orElse(null));
     }
 }

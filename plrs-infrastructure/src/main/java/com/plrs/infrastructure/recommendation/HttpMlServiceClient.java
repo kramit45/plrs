@@ -270,6 +270,8 @@ public class HttpMlServiceClient implements MlServiceClient {
                     optDouble(root, "precision_at_k"),
                     optDouble(root, "ndcg_at_k"),
                     optDouble(root, "coverage"),
+                    optDouble(root, "diversity"),
+                    optDouble(root, "novelty"),
                     optInt(root, "n_users"),
                     ranAt,
                     optString(root, "reason"));

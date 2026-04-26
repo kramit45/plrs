@@ -39,6 +39,12 @@ public class EvalRunRow {
     @Column(name = "coverage", precision = 5, scale = 4)
     private BigDecimal coverage;
 
+    @Column(name = "diversity", precision = 5, scale = 4)
+    private BigDecimal diversity;
+
+    @Column(name = "novelty", precision = 7, scale = 4)
+    private BigDecimal novelty;
+
     @Column(name = "n_users")
     private Integer nUsers;
 
@@ -58,6 +64,10 @@ public class EvalRunRow {
     public void setNdcgAtK(BigDecimal v) { this.ndcgAtK = v; }
     public BigDecimal getCoverage() { return coverage; }
     public void setCoverage(BigDecimal v) { this.coverage = v; }
+    public BigDecimal getDiversity() { return diversity; }
+    public void setDiversity(BigDecimal v) { this.diversity = v; }
+    public BigDecimal getNovelty() { return novelty; }
+    public void setNovelty(BigDecimal v) { this.novelty = v; }
     public Integer getNUsers() { return nUsers; }
     public void setNUsers(Integer v) { this.nUsers = v; }
 }

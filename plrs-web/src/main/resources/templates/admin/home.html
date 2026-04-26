@@ -44,6 +44,16 @@
                             th:text="${latestEval.coverage() != null}
                                      ? ${latestEval.coverage()} : '—'">-</dd>
 
+                        <dt class="col-sm-4">diversity</dt>
+                        <dd class="col-sm-8"
+                            th:text="${latestEval.diversity() != null}
+                                     ? ${latestEval.diversity()} : '—'">-</dd>
+
+                        <dt class="col-sm-4">novelty</dt>
+                        <dd class="col-sm-8"
+                            th:text="${latestEval.novelty() != null}
+                                     ? ${latestEval.novelty()} : '—'">-</dd>
+
                         <dt class="col-sm-4">users evaluated</dt>
                         <dd class="col-sm-8"
                             th:text="${latestEval.nUsers() != null}

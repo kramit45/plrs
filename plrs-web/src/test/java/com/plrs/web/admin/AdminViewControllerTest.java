@@ -54,6 +54,8 @@ class AdminViewControllerTest {
                 Optional.of(new BigDecimal("0.4500")),
                 Optional.of(new BigDecimal("0.5500")),
                 Optional.of(new BigDecimal("0.3000")),
+                Optional.of(new BigDecimal("0.6500")),
+                Optional.of(new BigDecimal("2.5000")),
                 Optional.of(12));
     }
 
