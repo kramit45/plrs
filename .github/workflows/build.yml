@@ -219,6 +219,15 @@ jobs:
           newman run test/newman/plrs-iter4.postman_collection.json \
             -e test/newman/plrs-iter4.postman_environment.json
 
+      - name: Run Newman full-regression collection
+        # Re-runs every Iter 1..4 happy-path flow as one consolidated
+        # Newman invocation. Useful as the pre-release smoke gate; runs
+        # AFTER the per-iter steps so a regression has both per-iter and
+        # consolidated reports for triage. Re-uses already-loaded seeds.
+        run: |
+          newman run test/newman/plrs-full-regression.postman_collection.json \
+            -e test/newman/plrs-full-regression.postman_environment.json
+
       - name: Upload application log on failure
         if: failure()
         uses: actions/upload-artifact@v4

@@ -1,10 +1,23 @@
 # PLRS — Newman API E2E
 
-This directory ships two collections:
+This directory ships per-iteration collections and a consolidated
+full-regression collection:
 
 - **`plrs-iter1.*`** — original Iter 1 register/login/me/logout flow
   (covered below).
 - **`plrs-iter2.*`** — Iter 2 catalogue + interaction + quiz flow.
+- **`plrs-iter3.*`** — Iter 3 recommendations + offline eval flow.
+- **`plrs-iter4.*`** — Iter 4 path planner, CSV import/export, lockout,
+  admin tunables.
+- **`plrs-full-regression.*`** — consolidated regression: every Iter
+  1..4 flow inside one Newman invocation, organised into four folders
+  (one per iter). Generated from the per-iter collections by
+  `build-full-regression.sh`. Run via `./run-full.sh` / `.\run-full.ps1`.
+
+CI runs **both** the iter-by-iter steps and the consolidated regression
+on every push/PR — the iter-by-iter reports localise failures fast, and
+the consolidated run proves the flows still compose end-to-end.
+
   Requires `seed.sql` to be loaded first (creates a known
   `INSTRUCTOR` user and a seeded demo quiz). Run via
   `./run-iter2.sh` / `.\run-iter2.ps1`. Loading the seed:
@@ -65,8 +78,23 @@ Override the target:
 BASE_URL=https://plrs.staging.example ./test/newman/run.sh
 ```
 
+## Full regression (one invocation)
+
+When you want a single command that exercises every iter:
+
+```bash
+# load all per-iter seeds in one shot, then run the consolidated collection
+./test/newman/run-full.sh --seed
+```
+
+`run-full.sh` regenerates `plrs-full-regression.postman_collection.json`
+from the per-iter sources if any of them is newer, so the consolidated
+run never drifts from the iter-by-iter runs.
+
 ## CI
 
-The GitHub Actions `newman` job runs this collection on every push/PR
-against a freshly packaged build with containerised Postgres + Redis.
-See `.github/workflows/build.yml`.
+The GitHub Actions `newman-e2e` job runs every per-iter collection
+(Iter 1..4) AND the consolidated full-regression collection on every
+push/PR against a freshly packaged build with containerised Postgres +
+Redis. The iter-by-iter steps localise failures fast; the consolidated
+run is the pre-release smoke gate. See `.github/workflows/build.yml`.
